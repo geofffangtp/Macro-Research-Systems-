@@ -10,7 +10,7 @@ export interface Source {
   style: string;
   tier: SourceTier;
   weight: number;
-  platform: 'twitter' | 'substack' | 'data' | 'manual';
+  platform: 'twitter' | 'substack' | 'data' | 'manual' | 'rss';
   rssUrl?: string;
   lastFetched?: string;
   rating?: number;
@@ -44,6 +44,7 @@ export interface DataRelease {
   frequency: 'daily' | 'weekly' | 'monthly' | 'quarterly';
   tier: 'tier1' | 'tier2' | 'tier3';
   thesisConnection: string;
+  fredSeriesId?: string;  // FRED API series ID for auto-fetch
   lastValue?: string;
   previousValue?: string;
   releaseDate?: string;

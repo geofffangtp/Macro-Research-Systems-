@@ -109,6 +109,21 @@ export const initialSources: Omit<Source, 'id' | 'createdAt' | 'updatedAt'>[] = 
   },
 ];
 
+// FRED Series ID mapping for auto-fetch
+export const FRED_SERIES_MAP: Record<string, string> = {
+  'VIX': 'VIXCLS',
+  'Credit Spreads (HY OAS)': 'BAMLH0A0HYM2',
+  'Continuing Jobless Claims': 'CCSA',
+  'Initial Jobless Claims': 'ICSA',
+  'Avg Duration of Unemployment': 'UEMPMEAN',
+  'Core CPI': 'CPILFESL',
+  'M2 Money Supply': 'WM2NS',
+  'Cass Freight Index': 'FRGSHPUSM649NCIS',
+  'Copper Prices': 'PCOPPUSDM',
+  '2Y Treasury': 'DGS2',
+  '10Y Treasury': 'DGS10',
+};
+
 export const initialDataReleases: Omit<DataRelease, 'id' | 'createdAt' | 'updatedAt'>[] = [
   // Tier 1: Core to Thesis (Always Track)
   {
@@ -117,6 +132,7 @@ export const initialDataReleases: Omit<DataRelease, 'id' | 'createdAt' | 'update
     frequency: 'monthly',
     tier: 'tier1',
     thesisConnection: 'Inventory glut thesis - watching for restocking signal',
+    // No FRED series - manual entry required
   },
   {
     name: 'Cass Freight Index',
@@ -124,6 +140,7 @@ export const initialDataReleases: Omit<DataRelease, 'id' | 'createdAt' | 'update
     frequency: 'monthly',
     tier: 'tier1',
     thesisConnection: 'Ground truth of physical economy',
+    fredSeriesId: 'FRGSHPUSM649NCIS',
   },
   {
     name: 'Continuing Jobless Claims',
@@ -131,6 +148,15 @@ export const initialDataReleases: Omit<DataRelease, 'id' | 'createdAt' | 'update
     frequency: 'weekly',
     tier: 'tier1',
     thesisConnection: 'Labor market deterioration signal',
+    fredSeriesId: 'CCSA',
+  },
+  {
+    name: 'Initial Jobless Claims',
+    description: 'Weekly initial unemployment claims',
+    frequency: 'weekly',
+    tier: 'tier1',
+    thesisConnection: 'Labor market real-time signal',
+    fredSeriesId: 'ICSA',
   },
   {
     name: 'Avg Duration of Unemployment',
@@ -138,6 +164,7 @@ export const initialDataReleases: Omit<DataRelease, 'id' | 'createdAt' | 'update
     frequency: 'monthly',
     tier: 'tier1',
     thesisConnection: 'Watching for peak/rollover',
+    fredSeriesId: 'UEMPMEAN',
   },
   {
     name: 'Core CPI',
@@ -145,6 +172,7 @@ export const initialDataReleases: Omit<DataRelease, 'id' | 'createdAt' | 'update
     frequency: 'monthly',
     tier: 'tier1',
     thesisConnection: 'Sticky inflation thesis',
+    fredSeriesId: 'CPILFESL',
   },
   {
     name: 'Credit Spreads (HY OAS)',
@@ -152,6 +180,7 @@ export const initialDataReleases: Omit<DataRelease, 'id' | 'createdAt' | 'update
     frequency: 'daily',
     tier: 'tier1',
     thesisConnection: 'Credit leads equities - Phase 1 washout signal',
+    fredSeriesId: 'BAMLH0A0HYM2',
   },
   {
     name: 'VIX',
@@ -159,6 +188,7 @@ export const initialDataReleases: Omit<DataRelease, 'id' | 'createdAt' | 'update
     frequency: 'daily',
     tier: 'tier1',
     thesisConnection: 'Complacency gauge - watching for spike >35-40',
+    fredSeriesId: 'VIXCLS',
   },
   // Tier 2: Supporting Indicators
   {
@@ -167,6 +197,7 @@ export const initialDataReleases: Omit<DataRelease, 'id' | 'createdAt' | 'update
     frequency: 'monthly',
     tier: 'tier2',
     thesisConnection: 'Leads industrial cycle',
+    // No FRED series - SIA data
   },
   {
     name: '% Stocks Above 200-DMA',
@@ -174,6 +205,7 @@ export const initialDataReleases: Omit<DataRelease, 'id' | 'createdAt' | 'update
     frequency: 'daily',
     tier: 'tier2',
     thesisConnection: 'Breadth confirmation',
+    // No FRED series - manual/scrape
   },
   {
     name: 'Equal Weight vs Cap Weight S&P',
@@ -181,6 +213,7 @@ export const initialDataReleases: Omit<DataRelease, 'id' | 'createdAt' | 'update
     frequency: 'daily',
     tier: 'tier2',
     thesisConnection: 'Broadening signal',
+    // No FRED series - calculated from RSP/SPY
   },
   {
     name: '2Y/10Y Spread',
@@ -188,6 +221,7 @@ export const initialDataReleases: Omit<DataRelease, 'id' | 'createdAt' | 'update
     frequency: 'daily',
     tier: 'tier2',
     thesisConnection: 'Yield curve steepening thesis',
+    fredSeriesId: 'T10Y2Y', // FRED has this directly
   },
   {
     name: 'M2 Money Supply',
@@ -195,6 +229,7 @@ export const initialDataReleases: Omit<DataRelease, 'id' | 'createdAt' | 'update
     frequency: 'weekly',
     tier: 'tier2',
     thesisConnection: 'Liquidity backdrop',
+    fredSeriesId: 'WM2NS',
   },
   {
     name: 'Shiller CAPE',
@@ -202,6 +237,7 @@ export const initialDataReleases: Omit<DataRelease, 'id' | 'createdAt' | 'update
     frequency: 'monthly',
     tier: 'tier2',
     thesisConnection: 'Valuation reset signal',
+    // No FRED series - manual entry
   },
   // Tier 3: AI/Energy Nexus
   {
@@ -210,6 +246,7 @@ export const initialDataReleases: Omit<DataRelease, 'id' | 'createdAt' | 'update
     frequency: 'quarterly',
     tier: 'tier3',
     thesisConnection: 'Tracking actual vs expected AI investment',
+    // No FRED series - earnings data
   },
   {
     name: 'Grid Interconnection Queue',
@@ -217,13 +254,15 @@ export const initialDataReleases: Omit<DataRelease, 'id' | 'createdAt' | 'update
     frequency: 'quarterly',
     tier: 'tier3',
     thesisConnection: 'Binding constraint on AI buildout',
+    // No FRED series - EIA/utility data
   },
   {
     name: 'Copper Prices',
     description: 'Industrial metal proxy for AI energy nexus',
-    frequency: 'daily',
+    frequency: 'monthly',
     tier: 'tier3',
     thesisConnection: 'AI energy nexus proxy',
+    fredSeriesId: 'PCOPPUSDM',
   },
   {
     name: 'Nickel Prices',
@@ -231,6 +270,7 @@ export const initialDataReleases: Omit<DataRelease, 'id' | 'createdAt' | 'update
     frequency: 'daily',
     tier: 'tier3',
     thesisConnection: 'Family office relevance',
+    // No FRED series - use Metals.dev API
   },
 ];
 
