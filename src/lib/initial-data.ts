@@ -1,7 +1,155 @@
 import { Source, DataRelease, Thesis } from '@/types';
 
 export const initialSources: Omit<Source, 'id' | 'createdAt' | 'updatedAt'>[] = [
-  // Tier 1: Core Signal (Always Include)
+  // ============================================
+  // TIER 1: CORE SUBSTACKS (Always Include)
+  // ============================================
+  {
+    handle: 'MacroCompass',
+    name: 'The Macro Compass',
+    focus: 'Institutional macro, credit impulse, yield curves, liquidity',
+    style: 'Data-driven, explains mechanisms',
+    tier: 'tier1',
+    weight: 1.0,
+    platform: 'substack',
+    rssUrl: 'https://themacrocompass.substack.com/feed',
+  },
+  {
+    handle: 'KylaScanlon',
+    name: "Kyla's Newsletter",
+    focus: 'Macro explained accessibly, market vibes, Fed policy',
+    style: 'Approachable, visual',
+    tier: 'tier1',
+    weight: 1.0,
+    platform: 'substack',
+    rssUrl: 'https://kyla.substack.com/feed',
+  },
+  {
+    handle: 'Noahpinion',
+    name: 'Noahpinion',
+    focus: 'Economics, policy, Asia, tech, immigration',
+    style: 'Long-form, analytical, contrarian',
+    tier: 'tier1',
+    weight: 1.0,
+    platform: 'substack',
+    rssUrl: 'https://www.noahpinion.blog/feed',
+  },
+  {
+    handle: 'Sinocism',
+    name: 'Sinocism',
+    focus: 'China politics, economics, US-China relations',
+    style: 'Daily briefing, authoritative',
+    tier: 'tier1',
+    weight: 1.0,
+    platform: 'substack',
+    rssUrl: 'https://sinocism.com/feed',
+  },
+  {
+    handle: 'CalculatedRisk',
+    name: 'Calculated Risk',
+    focus: 'Housing, employment, economic indicators',
+    style: 'Data-focused, charts, consistent methodology',
+    tier: 'tier1',
+    weight: 1.0,
+    platform: 'substack',
+    rssUrl: 'https://calculatedrisk.substack.com/feed',
+  },
+  {
+    handle: 'Apricitas',
+    name: 'Apricitas Economics',
+    focus: 'Deep economic analysis, labor markets, inflation',
+    style: 'Academic rigor, excellent charts',
+    tier: 'tier1',
+    weight: 1.0,
+    platform: 'substack',
+    rssUrl: 'https://www.apricitas.io/feed',
+  },
+  // ============================================
+  // TIER 2: IMPORTANT SUBSTACKS (High Value)
+  // ============================================
+  {
+    handle: 'TheDiff',
+    name: 'The Diff',
+    focus: 'Business strategy, tech, finance, complexity',
+    style: 'Dense, intellectual, pattern-matching',
+    tier: 'tier2',
+    weight: 0.85,
+    platform: 'substack',
+    rssUrl: 'https://www.thediff.co/feed',
+  },
+  {
+    handle: 'NetInterest',
+    name: 'Net Interest',
+    focus: 'Financial services, fintech, banking',
+    style: 'Deep dives, institutional knowledge',
+    tier: 'tier2',
+    weight: 0.85,
+    platform: 'substack',
+    rssUrl: 'https://www.netinterest.co/feed',
+  },
+  {
+    handle: 'Chartbook',
+    name: 'Chartbook',
+    focus: 'Economic history, geopolitics, global macro',
+    style: 'Historical context, charts, long-form',
+    tier: 'tier2',
+    weight: 0.85,
+    platform: 'substack',
+    rssUrl: 'https://adamtooze.substack.com/feed',
+  },
+  {
+    handle: 'TheOvershoot',
+    name: 'The Overshoot',
+    focus: 'Global macro, trade, China, inflation',
+    style: 'Data-heavy, institutional perspective',
+    tier: 'tier2',
+    weight: 0.85,
+    platform: 'substack',
+    rssUrl: 'https://theovershoot.co/feed',
+  },
+  {
+    handle: 'ArnaudBertrand',
+    name: 'Arnaud Bertrand',
+    focus: 'China, geopolitics, US-China relations',
+    style: 'Commentary, contrarian takes on China',
+    tier: 'tier2',
+    weight: 0.8,
+    platform: 'substack',
+    rssUrl: 'https://arnaudbertrand.substack.com/feed',
+  },
+  {
+    handle: 'EpsilonTheory',
+    name: 'Epsilon Theory',
+    focus: 'Narrative analysis, game theory, markets',
+    style: 'Meta-analysis, contrarian, long-form',
+    tier: 'tier2',
+    weight: 0.85,
+    platform: 'substack',
+    rssUrl: 'https://www.epsilontheory.com/feed/',
+  },
+  {
+    handle: 'Doomberg',
+    name: 'Doomberg',
+    focus: 'Energy, commodities, macro contrarian',
+    style: 'Provocative, well-researched, green chicken avatar',
+    tier: 'tier2',
+    weight: 0.85,
+    platform: 'substack',
+    rssUrl: 'https://newsletter.doomberg.com/feed',
+  },
+  {
+    handle: 'JobChick',
+    name: "The Job Chick's Insider Edge",
+    focus: 'Workforce intelligence, labor market signals, hiring trends',
+    style: 'Inside perspective on labor markets',
+    tier: 'tier2',
+    weight: 0.8,
+    platform: 'substack',
+    rssUrl: 'https://thejobchicksinsideredge.substack.com/feed',
+  },
+  // ============================================
+  // TIER 1: TWITTER/X ACCOUNTS (Core Signal)
+  // ============================================
   {
     handle: 'KobeissiLetter',
     name: 'The Kobeissi Letter',
@@ -10,26 +158,6 @@ export const initialSources: Omit<Source, 'id' | 'createdAt' | 'updatedAt'>[] = 
     tier: 'tier1',
     weight: 1.0,
     platform: 'twitter',
-  },
-  {
-    handle: 'MacroAlf',
-    name: 'Alfonso Peccatiello',
-    focus: 'Institutional macro, credit impulse, yield curves',
-    style: 'Data-driven, explains mechanisms',
-    tier: 'tier1',
-    weight: 1.0,
-    platform: 'substack',
-    rssUrl: 'https://themacrocompass.substack.com/feed',
-  },
-  {
-    handle: 'LynAldenContact',
-    name: 'Lyn Alden',
-    focus: 'Fiscal dominance, liquidity, debt cycles',
-    style: 'Long-form, structural analysis',
-    tier: 'tier1',
-    weight: 1.0,
-    platform: 'substack',
-    rssUrl: 'https://www.lynalden.com/feed/',
   },
   {
     handle: 'nickgerli1',
@@ -49,7 +177,9 @@ export const initialSources: Omit<Source, 'id' | 'createdAt' | 'updatedAt'>[] = 
     weight: 1.0,
     platform: 'twitter',
   },
-  // Tier 2: Rotate by Relevance
+  // ============================================
+  // TIER 2: TWITTER/X (Rotate by Relevance)
+  // ============================================
   {
     handle: 'EJ_Antoni',
     name: 'E.J. Antoni',
@@ -78,16 +208,6 @@ export const initialSources: Omit<Source, 'id' | 'createdAt' | 'updatedAt'>[] = 
     platform: 'twitter',
   },
   {
-    handle: 'Jesse_Felder',
-    name: 'Jesse Felder',
-    focus: 'Contrarian value, valuation',
-    style: 'Value-oriented',
-    tier: 'tier2',
-    weight: 0.7,
-    platform: 'substack',
-    rssUrl: 'https://thefelderreport.com/feed/',
-  },
-  {
     handle: 'LoganMohtashami',
     name: 'Logan Mohtashami',
     focus: 'Housing + labor market nexus',
@@ -96,7 +216,9 @@ export const initialSources: Omit<Source, 'id' | 'createdAt' | 'updatedAt'>[] = 
     weight: 0.7,
     platform: 'twitter',
   },
-  // Tier 3: Contrarian/Discovery
+  // ============================================
+  // TIER 3: CONTRARIAN / DISCOVERY
+  // ============================================
   {
     handle: 'zerohedge',
     name: 'ZeroHedge',
