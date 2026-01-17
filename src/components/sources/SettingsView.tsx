@@ -2,12 +2,14 @@
 
 import { useState } from 'react';
 import { useAppStore } from '@/store';
-import { Save, RefreshCw, Database, Key, Trash2 } from 'lucide-react';
+import { Save, RefreshCw, Database, Key, Trash2, AlertTriangle, Loader2 } from 'lucide-react';
 
 export function SettingsView() {
   const { thesis, updateThesis, initializeData } = useAppStore();
   const [apiKey, setApiKey] = useState('');
   const [showApiKey, setShowApiKey] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
+  const [resetMessage, setResetMessage] = useState('');
 
   // Thesis editing
   const [editingThesis, setEditingThesis] = useState(false);
@@ -24,10 +26,44 @@ export function SettingsView() {
     setEditingThesis(false);
   };
 
-  const handleResetData = () => {
-    if (confirm('This will reset all data to defaults. Are you sure?')) {
+  const handleResetData = async (resetType: string) => {
+    const messages: Record<string, string> = {
+      sources: 'This will reset all sources to defaults (including your Substacks). Continue?',
+      all: 'This will reset ALL data (sources, releases, knowledge, predictions, etc.) to defaults. Continue?',
+    };
+
+    if (!confirm(messages[resetType] || 'Are you sure?')) return;
+
+    setIsResetting(true);
+    setResetMessage('Clearing cloud data...');
+
+    try {
+      // Clear from Supabase
+      const response = await fetch('/api/reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ resetType }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to reset cloud data');
+      }
+
+      setResetMessage('Clearing local data...');
+
+      // Clear localStorage
       localStorage.removeItem('macro-research-store');
-      window.location.reload();
+
+      setResetMessage('Reloading with fresh data...');
+
+      // Reload to reinitialize
+      setTimeout(() => {
+        window.location.reload();
+      }, 500);
+    } catch (error) {
+      console.error('Reset error:', error);
+      setResetMessage('Error resetting. Try again.');
+      setIsResetting(false);
     }
   };
 
@@ -206,42 +242,68 @@ export function SettingsView() {
           <Database size={20} className="text-zinc-500" />
           <h3 className="font-semibold text-zinc-900 dark:text-white">Data Management</h3>
         </div>
+
+        {/* Reset status message */}
+        {isResetting && (
+          <div className="mb-4 flex items-center gap-2 rounded-lg bg-blue-50 px-3 py-2 text-sm text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+            <Loader2 size={14} className="animate-spin" />
+            {resetMessage}
+          </div>
+        )}
+
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                Initialize Default Data
+                Reset Sources to Defaults
               </p>
               <p className="text-xs text-zinc-500">
-                Load default sources and data releases
+                Reload all Substacks and Twitter sources from config
               </p>
             </div>
             <button
-              onClick={() => {
-                initializeData();
-                window.location.reload();
-              }}
-              className="flex items-center gap-2 rounded-lg bg-zinc-100 px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+              onClick={() => handleResetData('sources')}
+              disabled={isResetting}
+              className="flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-700 hover:bg-amber-100 disabled:opacity-50 dark:bg-amber-900/30 dark:text-amber-400 dark:hover:bg-amber-900/50"
             >
               <RefreshCw size={14} />
-              Initialize
+              Reset Sources
             </button>
           </div>
+
           <hr className="border-zinc-200 dark:border-zinc-800" />
+
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-red-600">Reset All Data</p>
               <p className="text-xs text-zinc-500">
-                Clear all stored data and start fresh
+                Clear everything (sources, knowledge, predictions, digests) and start fresh
               </p>
             </div>
             <button
-              onClick={handleResetData}
-              className="flex items-center gap-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600 hover:bg-red-100 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/50"
+              onClick={() => handleResetData('all')}
+              disabled={isResetting}
+              className="flex items-center gap-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600 hover:bg-red-100 disabled:opacity-50 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/50"
             >
               <Trash2 size={14} />
-              Reset
+              Reset All
             </button>
+          </div>
+
+          <hr className="border-zinc-200 dark:border-zinc-800" />
+
+          <div className="rounded-lg bg-zinc-50 p-3 dark:bg-zinc-800/50">
+            <div className="flex items-start gap-2">
+              <AlertTriangle size={16} className="mt-0.5 text-amber-500" />
+              <div className="text-xs text-zinc-600 dark:text-zinc-400">
+                <p className="font-medium">When to use reset:</p>
+                <ul className="mt-1 list-inside list-disc space-y-0.5">
+                  <li>After updating Substack sources in the code</li>
+                  <li>To get the latest configured data releases</li>
+                  <li>If data seems corrupted or out of sync</li>
+                </ul>
+              </div>
+            </div>
           </div>
         </div>
       </div>
