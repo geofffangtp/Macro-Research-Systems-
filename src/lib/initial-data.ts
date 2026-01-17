@@ -18,7 +18,8 @@ export const initialSources: Omit<Source, 'id' | 'createdAt' | 'updatedAt'>[] = 
     style: 'Data-driven, explains mechanisms',
     tier: 'tier1',
     weight: 1.0,
-    platform: 'twitter',
+    platform: 'substack',
+    rssUrl: 'https://themacrocompass.substack.com/feed',
   },
   {
     handle: 'LynAldenContact',
@@ -27,7 +28,8 @@ export const initialSources: Omit<Source, 'id' | 'createdAt' | 'updatedAt'>[] = 
     style: 'Long-form, structural analysis',
     tier: 'tier1',
     weight: 1.0,
-    platform: 'twitter',
+    platform: 'substack',
+    rssUrl: 'https://www.lynalden.com/feed/',
   },
   {
     handle: 'nickgerli1',
@@ -82,7 +84,8 @@ export const initialSources: Omit<Source, 'id' | 'createdAt' | 'updatedAt'>[] = 
     style: 'Value-oriented',
     tier: 'tier2',
     weight: 0.7,
-    platform: 'twitter',
+    platform: 'substack',
+    rssUrl: 'https://thefelderreport.com/feed/',
   },
   {
     handle: 'LoganMohtashami',
@@ -95,13 +98,14 @@ export const initialSources: Omit<Source, 'id' | 'createdAt' | 'updatedAt'>[] = 
   },
   // Tier 3: Contrarian/Discovery
   {
-    handle: 'zaborohdge',
+    handle: 'zerohedge',
     name: 'ZeroHedge',
     focus: 'Contrarian, market commentary',
     style: 'Sometimes conspiratorial - use with skepticism',
     tier: 'tier3',
     weight: 0.4,
-    platform: 'twitter',
+    platform: 'rss',
+    rssUrl: 'https://feeds.feedburner.com/zerohedge/feed',
   },
 ];
 

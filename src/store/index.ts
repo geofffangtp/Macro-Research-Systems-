@@ -14,6 +14,7 @@ import {
   Thesis,
 } from '@/types';
 import { initialSources, initialDataReleases, initialThesis } from '@/lib/initial-data';
+import * as db from '@/lib/supabase-service';
 
 function generateId(): string {
   return crypto.randomUUID();
@@ -69,7 +70,10 @@ interface AppState {
   activeView: 'digest' | 'knowledge' | 'sources' | 'data' | 'predictions' | 'settings';
   setActiveView: (view: AppState['activeView']) => void;
 
-  // Initialize with default data
+  // Data loading
+  isLoading: boolean;
+  isSupabaseConnected: boolean;
+  loadFromSupabase: () => Promise<void>;
   initializeData: () => void;
 }
 
@@ -89,6 +93,61 @@ export const useAppStore = create<AppState>()(
       thesis: null,
       sidebarOpen: true,
       activeView: 'digest',
+      isLoading: false,
+      isSupabaseConnected: false,
+
+      // Load data from Supabase
+      loadFromSupabase: async () => {
+        if (!db.isSupabaseConfigured()) {
+          console.log('Supabase not configured, using localStorage');
+          return;
+        }
+
+        set({ isLoading: true });
+
+        try {
+          const data = await db.loadAllData();
+
+          // Only update state if we got data from Supabase
+          const hasData = data.sources.length > 0 ||
+                          data.dataReleases.length > 0 ||
+                          data.thesis !== null;
+
+          if (hasData) {
+            set({
+              sources: data.sources,
+              sourceItems: data.sourceItems,
+              dataReleases: data.dataReleases,
+              knowledgeEntries: data.knowledgeEntries,
+              predictions: data.predictions,
+              digests: data.digests,
+              chatSessions: data.chatSessions,
+              thesis: data.thesis,
+              isSupabaseConnected: true,
+            });
+            console.log('Loaded data from Supabase');
+          } else {
+            // No data in Supabase, initialize with defaults and save to Supabase
+            console.log('No data in Supabase, initializing with defaults');
+            get().initializeData();
+            set({ isSupabaseConnected: true });
+
+            // Save initial data to Supabase
+            const state = get();
+            await Promise.all([
+              ...state.sources.map((s) => db.saveSource(s)),
+              ...state.dataReleases.map((d) => db.saveDataRelease(d)),
+              state.thesis ? db.saveThesis(state.thesis) : Promise.resolve(),
+            ]);
+            console.log('Saved initial data to Supabase');
+          }
+        } catch (error) {
+          console.error('Error loading from Supabase:', error);
+          set({ isSupabaseConnected: false });
+        } finally {
+          set({ isLoading: false });
+        }
+      },
 
       // Source actions
       addSource: (source) => {
@@ -99,14 +158,30 @@ export const useAppStore = create<AppState>()(
           updatedAt: new Date().toISOString(),
         };
         set((state) => ({ sources: [...state.sources, newSource] }));
+
+        // Sync to Supabase
+        if (get().isSupabaseConnected) {
+          db.saveSource(newSource);
+        }
       },
 
       updateSource: (id, updates) => {
-        set((state) => ({
-          sources: state.sources.map((s) =>
-            s.id === id ? { ...s, ...updates, updatedAt: new Date().toISOString() } : s
-          ),
-        }));
+        let updatedSource: Source | undefined;
+        set((state) => {
+          const sources = state.sources.map((s) => {
+            if (s.id === id) {
+              updatedSource = { ...s, ...updates, updatedAt: new Date().toISOString() };
+              return updatedSource;
+            }
+            return s;
+          });
+          return { sources };
+        });
+
+        // Sync to Supabase
+        if (get().isSupabaseConnected && updatedSource) {
+          db.saveSource(updatedSource);
+        }
       },
 
       deleteSource: (id) => {
@@ -114,6 +189,12 @@ export const useAppStore = create<AppState>()(
           sources: state.sources.filter((s) => s.id !== id),
           sourceItems: state.sourceItems.filter((i) => i.sourceId !== id),
         }));
+
+        // Sync to Supabase
+        if (get().isSupabaseConnected) {
+          db.deleteSourceFromDb(id);
+          db.deleteSourceItemsForSource(id);
+        }
       },
 
       addSourceItem: (item) => {
@@ -123,20 +204,45 @@ export const useAppStore = create<AppState>()(
           createdAt: new Date().toISOString(),
         };
         set((state) => ({ sourceItems: [newItem, ...state.sourceItems] }));
+
+        // Sync to Supabase
+        if (get().isSupabaseConnected) {
+          db.saveSourceItem(newItem);
+        }
       },
 
       updateSourceItem: (id, updates) => {
-        set((state) => ({
-          sourceItems: state.sourceItems.map((i) => (i.id === id ? { ...i, ...updates } : i)),
-        }));
+        let updatedItem: SourceItem | undefined;
+        set((state) => {
+          const sourceItems = state.sourceItems.map((i) => {
+            if (i.id === id) {
+              updatedItem = { ...i, ...updates };
+              return updatedItem;
+            }
+            return i;
+          });
+          return { sourceItems };
+        });
+
+        // Sync to Supabase
+        if (get().isSupabaseConnected && updatedItem) {
+          db.saveSourceItem(updatedItem);
+        }
       },
 
       rateSourceItem: (id, rating) => {
-        set((state) => ({
-          sourceItems: state.sourceItems.map((i) =>
-            i.id === id ? { ...i, userRating: i.userRating === rating ? undefined : rating } : i
-          ),
-        }));
+        let updatedItem: SourceItem | undefined;
+        set((state) => {
+          const sourceItems = state.sourceItems.map((i) => {
+            if (i.id === id) {
+              updatedItem = { ...i, userRating: i.userRating === rating ? undefined : rating };
+              return updatedItem;
+            }
+            return i;
+          });
+          return { sourceItems };
+        });
+
         // Also update source weight based on rating
         const item = get().sourceItems.find((i) => i.id === id);
         if (item?.sourceId) {
@@ -148,21 +254,50 @@ export const useAppStore = create<AppState>()(
             });
           }
         }
+
+        // Sync to Supabase
+        if (get().isSupabaseConnected && updatedItem) {
+          db.saveSourceItem(updatedItem);
+        }
       },
 
       flagSourceItem: (id, flagged) => {
-        set((state) => ({
-          sourceItems: state.sourceItems.map((i) => (i.id === id ? { ...i, isFlagged: flagged } : i)),
-        }));
+        let updatedItem: SourceItem | undefined;
+        set((state) => {
+          const sourceItems = state.sourceItems.map((i) => {
+            if (i.id === id) {
+              updatedItem = { ...i, isFlagged: flagged };
+              return updatedItem;
+            }
+            return i;
+          });
+          return { sourceItems };
+        });
+
+        // Sync to Supabase
+        if (get().isSupabaseConnected && updatedItem) {
+          db.saveSourceItem(updatedItem);
+        }
       },
 
       // Data Release actions
       updateDataRelease: (id, updates) => {
-        set((state) => ({
-          dataReleases: state.dataReleases.map((d) =>
-            d.id === id ? { ...d, ...updates, updatedAt: new Date().toISOString() } : d
-          ),
-        }));
+        let updatedRelease: DataRelease | undefined;
+        set((state) => {
+          const dataReleases = state.dataReleases.map((d) => {
+            if (d.id === id) {
+              updatedRelease = { ...d, ...updates, updatedAt: new Date().toISOString() };
+              return updatedRelease;
+            }
+            return d;
+          });
+          return { dataReleases };
+        });
+
+        // Sync to Supabase
+        if (get().isSupabaseConnected && updatedRelease) {
+          db.saveDataRelease(updatedRelease);
+        }
       },
 
       // Knowledge Base actions
@@ -174,20 +309,41 @@ export const useAppStore = create<AppState>()(
           updatedAt: new Date().toISOString(),
         };
         set((state) => ({ knowledgeEntries: [...state.knowledgeEntries, newEntry] }));
+
+        // Sync to Supabase
+        if (get().isSupabaseConnected) {
+          db.saveKnowledgeEntry(newEntry);
+        }
       },
 
       updateKnowledgeEntry: (id, updates) => {
-        set((state) => ({
-          knowledgeEntries: state.knowledgeEntries.map((e) =>
-            e.id === id ? { ...e, ...updates, updatedAt: new Date().toISOString() } : e
-          ),
-        }));
+        let updatedEntry: KnowledgeEntry | undefined;
+        set((state) => {
+          const knowledgeEntries = state.knowledgeEntries.map((e) => {
+            if (e.id === id) {
+              updatedEntry = { ...e, ...updates, updatedAt: new Date().toISOString() };
+              return updatedEntry;
+            }
+            return e;
+          });
+          return { knowledgeEntries };
+        });
+
+        // Sync to Supabase
+        if (get().isSupabaseConnected && updatedEntry) {
+          db.saveKnowledgeEntry(updatedEntry);
+        }
       },
 
       deleteKnowledgeEntry: (id) => {
         set((state) => ({
           knowledgeEntries: state.knowledgeEntries.filter((e) => e.id !== id),
         }));
+
+        // Sync to Supabase
+        if (get().isSupabaseConnected) {
+          db.deleteKnowledgeEntryFromDb(id);
+        }
       },
 
       // Prediction actions
@@ -198,12 +354,30 @@ export const useAppStore = create<AppState>()(
           createdAt: new Date().toISOString(),
         };
         set((state) => ({ predictions: [...state.predictions, newPrediction] }));
+
+        // Sync to Supabase
+        if (get().isSupabaseConnected) {
+          db.savePrediction(newPrediction);
+        }
       },
 
       updatePrediction: (id, updates) => {
-        set((state) => ({
-          predictions: state.predictions.map((p) => (p.id === id ? { ...p, ...updates } : p)),
-        }));
+        let updatedPrediction: Prediction | undefined;
+        set((state) => {
+          const predictions = state.predictions.map((p) => {
+            if (p.id === id) {
+              updatedPrediction = { ...p, ...updates };
+              return updatedPrediction;
+            }
+            return p;
+          });
+          return { predictions };
+        });
+
+        // Sync to Supabase
+        if (get().isSupabaseConnected && updatedPrediction) {
+          db.savePrediction(updatedPrediction);
+        }
       },
 
       // Digest actions
@@ -216,6 +390,11 @@ export const useAppStore = create<AppState>()(
           digests: [newDigest, ...state.digests],
           currentDigest: newDigest,
         }));
+
+        // Sync to Supabase
+        if (get().isSupabaseConnected) {
+          db.saveDigest(newDigest);
+        }
       },
 
       setCurrentDigest: (digest) => {
@@ -237,6 +416,12 @@ export const useAppStore = create<AppState>()(
           chatSessions: [...state.chatSessions, newSession],
           activeChatSession: newSession,
         }));
+
+        // Sync to Supabase
+        if (get().isSupabaseConnected) {
+          db.saveChatSession(newSession);
+        }
+
         return newSession;
       },
 
@@ -246,21 +431,38 @@ export const useAppStore = create<AppState>()(
           id: generateId(),
           createdAt: new Date().toISOString(),
         };
-        set((state) => ({
-          chatSessions: state.chatSessions.map((s) =>
-            s.id === sessionId
-              ? { ...s, messages: [...s.messages, newMessage], updatedAt: new Date().toISOString() }
-              : s
-          ),
-          activeChatSession:
-            state.activeChatSession?.id === sessionId
-              ? {
-                  ...state.activeChatSession,
-                  messages: [...state.activeChatSession.messages, newMessage],
-                  updatedAt: new Date().toISOString(),
-                }
-              : state.activeChatSession,
-        }));
+
+        let updatedSession: ChatSession | undefined;
+        set((state) => {
+          const chatSessions = state.chatSessions.map((s) => {
+            if (s.id === sessionId) {
+              updatedSession = {
+                ...s,
+                messages: [...s.messages, newMessage],
+                updatedAt: new Date().toISOString()
+              };
+              return updatedSession;
+            }
+            return s;
+          });
+
+          return {
+            chatSessions,
+            activeChatSession:
+              state.activeChatSession?.id === sessionId
+                ? {
+                    ...state.activeChatSession,
+                    messages: [...state.activeChatSession.messages, newMessage],
+                    updatedAt: new Date().toISOString(),
+                  }
+                : state.activeChatSession,
+          };
+        });
+
+        // Sync to Supabase
+        if (get().isSupabaseConnected && updatedSession) {
+          db.saveChatSession(updatedSession);
+        }
       },
 
       setActiveChatSession: (session) => {
@@ -269,11 +471,19 @@ export const useAppStore = create<AppState>()(
 
       // Thesis actions
       updateThesis: (updates) => {
-        set((state) => ({
-          thesis: state.thesis
-            ? { ...state.thesis, ...updates, lastUpdated: new Date().toISOString() }
-            : null,
-        }));
+        let updatedThesis: Thesis | null = null;
+        set((state) => {
+          if (state.thesis) {
+            updatedThesis = { ...state.thesis, ...updates, lastUpdated: new Date().toISOString() };
+            return { thesis: updatedThesis };
+          }
+          return {};
+        });
+
+        // Sync to Supabase
+        if (get().isSupabaseConnected && updatedThesis) {
+          db.saveThesis(updatedThesis);
+        }
       },
 
       // UI actions
