@@ -1,17 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchRSSFeed, truncateContent } from '@/lib/rss';
+import { validateRequest, rssRequestSchema } from '@/lib/validations';
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { url } = body;
-
-    if (!url) {
+    // Validate request body with SSRF protection
+    const validation = await validateRequest(request, rssRequestSchema);
+    if (!validation.success) {
       return NextResponse.json(
-        { error: 'URL is required' },
+        { error: validation.error },
         { status: 400 }
       );
     }
+
+    const { url } = validation.data;
 
     const items = await fetchRSSFeed(url);
     const processedItems = items.map((item) => ({

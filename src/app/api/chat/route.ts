@@ -1,15 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { discussItem } from '@/lib/claude';
+import { validateRequest, chatRequestSchema } from '@/lib/validations';
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { item, message, previousMessages, thesis } = body;
+    // Validate request body
+    const validation = await validateRequest(request, chatRequestSchema);
+    if (!validation.success) {
+      return NextResponse.json(
+        { error: validation.error },
+        { status: 400 }
+      );
+    }
+
+    const { item, message, previousMessages, thesis } = validation.data;
 
     if (!process.env.ANTHROPIC_API_KEY) {
       return NextResponse.json(
         { error: 'ANTHROPIC_API_KEY not configured' },
         { status: 500 }
+      );
+    }
+
+    if (!item) {
+      return NextResponse.json(
+        { error: 'Item is required for chat' },
+        { status: 400 }
       );
     }
 

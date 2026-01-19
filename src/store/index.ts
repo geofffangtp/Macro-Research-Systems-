@@ -161,7 +161,7 @@ export const useAppStore = create<AppState>()(
 
         // Sync to Supabase
         if (get().isSupabaseConnected) {
-          db.saveSource(newSource);
+          db.saveSource(newSource).catch((err) => console.error('Failed to save source:', err));
         }
       },
 
@@ -180,7 +180,7 @@ export const useAppStore = create<AppState>()(
 
         // Sync to Supabase
         if (get().isSupabaseConnected && updatedSource) {
-          db.saveSource(updatedSource);
+          db.saveSource(updatedSource).catch((err) => console.error('Failed to update source:', err));
         }
       },
 
@@ -192,8 +192,8 @@ export const useAppStore = create<AppState>()(
 
         // Sync to Supabase
         if (get().isSupabaseConnected) {
-          db.deleteSourceFromDb(id);
-          db.deleteSourceItemsForSource(id);
+          db.deleteSourceFromDb(id).catch((err) => console.error('Failed to delete source:', err));
+          db.deleteSourceItemsForSource(id).catch((err) => console.error('Failed to delete source items:', err));
         }
       },
 
@@ -207,7 +207,7 @@ export const useAppStore = create<AppState>()(
 
         // Sync to Supabase
         if (get().isSupabaseConnected) {
-          db.saveSourceItem(newItem);
+          db.saveSourceItem(newItem).catch((err) => console.error('Failed to save source item:', err));
         }
       },
 
@@ -226,7 +226,7 @@ export const useAppStore = create<AppState>()(
 
         // Sync to Supabase
         if (get().isSupabaseConnected && updatedItem) {
-          db.saveSourceItem(updatedItem);
+          db.saveSourceItem(updatedItem).catch((err) => console.error('Failed to update source item:', err));
         }
       },
 
@@ -257,7 +257,7 @@ export const useAppStore = create<AppState>()(
 
         // Sync to Supabase
         if (get().isSupabaseConnected && updatedItem) {
-          db.saveSourceItem(updatedItem);
+          db.saveSourceItem(updatedItem).catch((err) => console.error('Failed to save rated item:', err));
         }
       },
 
@@ -276,7 +276,7 @@ export const useAppStore = create<AppState>()(
 
         // Sync to Supabase
         if (get().isSupabaseConnected && updatedItem) {
-          db.saveSourceItem(updatedItem);
+          db.saveSourceItem(updatedItem).catch((err) => console.error('Failed to save flagged item:', err));
         }
       },
 
@@ -296,7 +296,7 @@ export const useAppStore = create<AppState>()(
 
         // Sync to Supabase
         if (get().isSupabaseConnected && updatedRelease) {
-          db.saveDataRelease(updatedRelease);
+          db.saveDataRelease(updatedRelease).catch((err) => console.error('Failed to save data release:', err));
         }
       },
 
@@ -312,7 +312,7 @@ export const useAppStore = create<AppState>()(
 
         // Sync to Supabase
         if (get().isSupabaseConnected) {
-          db.saveKnowledgeEntry(newEntry);
+          db.saveKnowledgeEntry(newEntry).catch((err) => console.error('Failed to save knowledge entry:', err));
         }
       },
 
@@ -331,7 +331,7 @@ export const useAppStore = create<AppState>()(
 
         // Sync to Supabase
         if (get().isSupabaseConnected && updatedEntry) {
-          db.saveKnowledgeEntry(updatedEntry);
+          db.saveKnowledgeEntry(updatedEntry).catch((err) => console.error('Failed to update knowledge entry:', err));
         }
       },
 
@@ -342,7 +342,7 @@ export const useAppStore = create<AppState>()(
 
         // Sync to Supabase
         if (get().isSupabaseConnected) {
-          db.deleteKnowledgeEntryFromDb(id);
+          db.deleteKnowledgeEntryFromDb(id).catch((err) => console.error('Failed to delete knowledge entry:', err));
         }
       },
 
@@ -357,7 +357,7 @@ export const useAppStore = create<AppState>()(
 
         // Sync to Supabase
         if (get().isSupabaseConnected) {
-          db.savePrediction(newPrediction);
+          db.savePrediction(newPrediction).catch((err) => console.error('Failed to save prediction:', err));
         }
       },
 
@@ -376,7 +376,7 @@ export const useAppStore = create<AppState>()(
 
         // Sync to Supabase
         if (get().isSupabaseConnected && updatedPrediction) {
-          db.savePrediction(updatedPrediction);
+          db.savePrediction(updatedPrediction).catch((err) => console.error('Failed to update prediction:', err));
         }
       },
 
@@ -393,7 +393,7 @@ export const useAppStore = create<AppState>()(
 
         // Sync to Supabase
         if (get().isSupabaseConnected) {
-          db.saveDigest(newDigest);
+          db.saveDigest(newDigest).catch((err) => console.error('Failed to save digest:', err));
         }
       },
 
@@ -419,7 +419,7 @@ export const useAppStore = create<AppState>()(
 
         // Sync to Supabase
         if (get().isSupabaseConnected) {
-          db.saveChatSession(newSession);
+          db.saveChatSession(newSession).catch((err) => console.error('Failed to save chat session:', err));
         }
 
         return newSession;
@@ -461,7 +461,7 @@ export const useAppStore = create<AppState>()(
 
         // Sync to Supabase
         if (get().isSupabaseConnected && updatedSession) {
-          db.saveChatSession(updatedSession);
+          db.saveChatSession(updatedSession).catch((err) => console.error('Failed to update chat session:', err));
         }
       },
 
@@ -482,7 +482,7 @@ export const useAppStore = create<AppState>()(
 
         // Sync to Supabase
         if (get().isSupabaseConnected && updatedThesis) {
-          db.saveThesis(updatedThesis);
+          db.saveThesis(updatedThesis).catch((err) => console.error('Failed to save thesis:', err));
         }
       },
 

@@ -1,9 +1,25 @@
 import { NextResponse } from 'next/server';
 import { fetchAllMacroIndicators, getLatestFredValue, isFredConfigured, FRED_SERIES } from '@/lib/fred';
+import { validateRequest, fredRefreshSchema } from '@/lib/validations';
+import { z } from 'zod';
+
+// Schema for GET query params
+const fredGetSchema = z.object({
+  series: z.string().max(50).optional(),
+});
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const seriesId = searchParams.get('series');
+
+  // Validate query param
+  const validation = fredGetSchema.safeParse({ series: seriesId });
+  if (!validation.success) {
+    return NextResponse.json(
+      { error: 'Invalid series parameter' },
+      { status: 400 }
+    );
+  }
 
   if (!isFredConfigured()) {
     return NextResponse.json(
@@ -42,9 +58,17 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  // Endpoint to refresh specific indicators
   try {
-    const { seriesIds } = await request.json();
+    // Validate request body
+    const validation = await validateRequest(request, fredRefreshSchema);
+    if (!validation.success) {
+      return NextResponse.json(
+        { error: validation.error },
+        { status: 400 }
+      );
+    }
+
+    const { seriesIds } = validation.data;
 
     if (!isFredConfigured()) {
       return NextResponse.json(

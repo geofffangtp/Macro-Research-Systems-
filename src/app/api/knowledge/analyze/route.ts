@@ -1,17 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { analyzeForKnowledgeBase } from '@/lib/claude';
+import { validateRequest, knowledgeAnalyzeSchema } from '@/lib/validations';
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { content, existingTopics } = body;
-
-    if (!content) {
+    // Validate request body
+    const validation = await validateRequest(request, knowledgeAnalyzeSchema);
+    if (!validation.success) {
       return NextResponse.json(
-        { error: 'Content is required' },
+        { error: validation.error },
         { status: 400 }
       );
     }
+
+    const { content, existingTopics } = validation.data;
 
     if (!process.env.ANTHROPIC_API_KEY) {
       return NextResponse.json(

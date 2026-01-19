@@ -1,10 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateDigest } from '@/lib/claude';
+import { validateRequest, digestRequestSchema } from '@/lib/validations';
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { items, dataReleases, thesis } = body;
+    // Validate request body
+    const validation = await validateRequest(request, digestRequestSchema);
+    if (!validation.success) {
+      return NextResponse.json(
+        { error: validation.error },
+        { status: 400 }
+      );
+    }
+
+    const { items, dataReleases, thesis } = validation.data;
 
     if (!process.env.ANTHROPIC_API_KEY) {
       return NextResponse.json(
