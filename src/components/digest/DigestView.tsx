@@ -46,35 +46,46 @@ export function DigestView() {
   const generateDigest = async () => {
     setIsGenerating(true);
     try {
-      const recentItems = sourceItems.slice(0, 20).map((item) => ({
-        source: item.author || 'Unknown',
-        content: item.content,
-        url: item.url,
-      }));
+      // Get recent items with better source attribution
+      const recentItems = sourceItems.slice(0, 30).map((item) => {
+        // Try to get a good source name
+        const source = item.source?.name || item.author || 'Unknown';
+        return {
+          source,
+          content: item.content,
+          url: item.url,
+          title: item.title,
+        };
+      });
 
-      const dataWithValues = dataReleases
-        .filter((d) => d.lastValue || d.trend)
-        .map((d) => ({
-          name: d.name,
-          value: d.lastValue,
-          trend: d.trend,
-        }));
+      // Build full thesis context including turning point signals
+      const thesisPayload = thesis
+        ? {
+            name: thesis.name,
+            summary: thesis.summary,
+            keyMonitors: thesis.keyMonitors,
+            turningPointSignals: thesis.turningPointSignals,
+          }
+        : null;
 
       const response = await fetch('/api/digest/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           items: recentItems,
-          dataReleases: dataWithValues,
-          thesis: thesis
-            ? { summary: thesis.summary, keyMonitors: thesis.keyMonitors }
-            : null,
+          thesis: thesisPayload,
+          // TODO: Add knowledge entries when KB integration is done
         }),
       });
 
       if (response.ok) {
         const data = await response.json();
         setGeneratedContent(data.digest);
+
+        // Log market data for debugging
+        if (data.marketData) {
+          console.log('Market data used:', data.marketData);
+        }
 
         addDigest({
           date: new Date().toISOString().split('T')[0],
@@ -84,6 +95,9 @@ export function DigestView() {
           generatedAt: new Date().toISOString(),
           readingTimeMinutes: 15,
         });
+      } else {
+        const errorData = await response.json();
+        console.error('Digest generation failed:', errorData.error);
       }
     } catch (error) {
       console.error('Error generating digest:', error);
