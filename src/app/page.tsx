@@ -10,10 +10,12 @@ import { SourcesView } from '@/components/sources/SourcesView';
 import { DataReleasesView } from '@/components/sources/DataReleasesView';
 import { PredictionsView } from '@/components/sources/PredictionsView';
 import { SettingsView } from '@/components/sources/SettingsView';
+import { ChatPanel } from '@/components/chat/ChatPanel';
 
 export default function Home() {
   const { activeView, sidebarOpen, initializeData, loadFromSupabase, isLoading, isSupabaseConnected } = useAppStore();
   const [initialized, setInitialized] = useState(false);
+  const [showChatPanel, setShowChatPanel] = useState(true);
 
   useEffect(() => {
     const init = async () => {
@@ -47,6 +49,9 @@ export default function Home() {
         return <DigestView />;
     }
   };
+
+  // Only show chat panel on digest view
+  const shouldShowChat = activeView === 'digest' && showChatPanel;
 
   // Show loading screen while initializing
   if (!initialized || isLoading) {
@@ -83,7 +88,7 @@ export default function Home() {
 
       {/* Connection status indicator */}
       {isSupabaseConnected && (
-        <div className="fixed bottom-4 right-4 z-50 flex items-center gap-2 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs px-3 py-1.5 rounded-full shadow-sm">
+        <div className="fixed bottom-4 left-4 z-50 flex items-center gap-2 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs px-3 py-1.5 rounded-full shadow-sm">
           <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
           Cloud Sync Active
         </div>
@@ -91,12 +96,26 @@ export default function Home() {
 
       <Sidebar />
       <Header />
+
+      {/* Main content area with optional chat panel */}
       <main
         className={`relative pt-20 transition-all duration-300 ${
           sidebarOpen ? 'pl-64' : 'pl-16'
         }`}
       >
-        <div className="px-6 pb-8">{renderView()}</div>
+        <div className={`flex ${shouldShowChat ? 'gap-6' : ''} px-6 pb-8`}>
+          {/* Main content - digest or other views */}
+          <div className={shouldShowChat ? 'flex-1 min-w-0' : 'w-full'}>
+            {renderView()}
+          </div>
+
+          {/* Persistent chat panel - only on digest view */}
+          {shouldShowChat && (
+            <div className="w-[400px] flex-shrink-0 sticky top-24 h-[calc(100vh-120px)]">
+              <ChatPanel />
+            </div>
+          )}
+        </div>
       </main>
     </div>
   );

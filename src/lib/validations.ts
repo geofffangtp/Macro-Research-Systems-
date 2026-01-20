@@ -36,24 +36,64 @@ export const rssRequestSchema = z.object({
   url: safeUrlSchema,
 });
 
-// Chat endpoint schema
+// Chat endpoint schema - enhanced for persistent panel with full context
 export const chatRequestSchema = z.object({
+  // Legacy: single item context (for backward compatibility)
   item: z.object({
     title: z.string().max(1000),
     content: z.string().max(50000),
     source: z.string().max(500).optional(),
   }).optional(),
+  // User's message
   message: z.string().min(1).max(10000),
+  // Conversation history
   previousMessages: z.array(
     z.object({
       role: z.enum(['user', 'assistant']),
       content: z.string().max(50000),
     })
   ).max(50).optional(),
+  // Legacy thesis (for backward compatibility)
   thesis: z.object({
     name: z.string().max(500).optional(),
     summary: z.string().max(5000),
   }).nullish(),
+  // Enhanced context for persistent panel
+  context: z.object({
+    digest: z.object({
+      date: z.string(),
+      content: z.string().max(20000),
+    }).optional(),
+    thesis: z.object({
+      name: z.string(),
+      summary: z.string(),
+      scenarios: z.array(z.object({
+        name: z.string(),
+        probability: z.number(),
+        description: z.string(),
+      })).optional(),
+      keyMonitors: z.array(z.string()).optional(),
+      turningPointSignals: z.array(z.object({
+        phase: z.number(),
+        name: z.string(),
+        indicators: z.array(z.string()),
+        status: z.string(),
+      })).optional(),
+    }).optional(),
+    knowledgeEntries: z.array(z.object({
+      topic: z.string(),
+      conclusion: z.string(),
+      thesisImpact: z.string().optional(),
+      catalystToWatch: z.string().optional(),
+      status: z.string().optional(),
+    })).max(20).optional(),
+    openThreads: z.array(z.object({
+      content: z.string(),
+      createdDate: z.string(),
+    })).max(10).optional(),
+  }).optional(),
+  // Enable web search
+  enableWebSearch: z.boolean().optional(),
 });
 
 // Digest generation schema

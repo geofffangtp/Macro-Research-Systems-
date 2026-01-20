@@ -31,8 +31,17 @@ import {
   X,
   ChevronLeft,
 } from 'lucide-react';
-import { ChatModal } from '@/components/ui/ChatModal';
 import { InternationalDataInput } from '@/components/ui/InternationalDataInput';
+
+// Helper to dispatch discuss event to the chat panel
+function dispatchDiscussEvent(item: { title: string; content: string; source?: string }) {
+  const event = new CustomEvent('discuss-item', {
+    detail: {
+      prompt: `Let's discuss: "${item.title}"\n\n${item.content.slice(0, 500)}${item.content.length > 500 ? '...' : ''}`,
+    },
+  });
+  window.dispatchEvent(event);
+}
 
 // Helper function to extract open threads from digest content
 function extractOpenThreads(content: string): string[] {
@@ -116,11 +125,6 @@ export function DigestView() {
     threads: false,
     history: false,
   });
-  const [chatItem, setChatItem] = useState<{
-    title: string;
-    content: string;
-    source?: string;
-  } | null>(null);
   const [generatedContent, setGeneratedContent] = useState<string>('');
   const [showThesisEditor, setShowThesisEditor] = useState(false);
   const [editingScenario, setEditingScenario] = useState<string | null>(null);
@@ -413,7 +417,7 @@ export function DigestView() {
                 key={item.id}
                 item={item}
                 onDiscuss={() =>
-                  setChatItem({
+                  dispatchDiscussEvent({
                     title: item.title,
                     content: item.content,
                     source: item.author,
@@ -730,11 +734,6 @@ export function DigestView() {
           )}
         </div>
       </DigestSection>
-
-      {/* Chat Modal */}
-      {chatItem && (
-        <ChatModal item={chatItem} onClose={() => setChatItem(null)} />
-      )}
 
       {/* Digest History Modal */}
       {showDigestHistory && (
