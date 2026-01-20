@@ -2,6 +2,14 @@
 
 export type SourceTier = 'tier1' | 'tier2' | 'tier3' | 'tier4';
 
+export interface SourceMetrics {
+  citationCount: number; // Times cited in digests
+  upvotes: number;
+  downvotes: number;
+  lastCitedDate?: string;
+  avgRelevanceScore?: number; // Calculated from item ratings
+}
+
 export interface Source {
   id: string;
   handle: string;
@@ -17,6 +25,10 @@ export interface Source {
   totalRatings?: number;
   createdAt: string;
   updatedAt: string;
+  // Source intelligence fields
+  metrics?: SourceMetrics;
+  mutedUntil?: string; // ISO date string for "mute today" feature
+  suggestedWeight?: number; // AI-suggested weight based on metrics
 }
 
 export interface SourceItem {
@@ -105,6 +117,16 @@ export interface DigestItem {
   userRating?: 'up' | 'down';
 }
 
+export interface OpenThread {
+  id: string;
+  content: string;
+  createdDate: string;
+  status: 'open' | 'resolved' | 'stale';
+  resolvedDate?: string;
+  resolvedBy?: string; // Reference to digest that resolved it
+  relatedTopics?: string[];
+}
+
 export interface Digest {
   id: string;
   date: string;
@@ -113,6 +135,9 @@ export interface Digest {
   marketActivity: 'quiet' | 'moderate' | 'active';
   generatedAt: string;
   readingTimeMinutes: number;
+  rawContent?: string; // Store full generated content
+  thesisFlags?: string[]; // Items flagged for thesis review
+  openThreads?: OpenThread[]; // Structured open threads for continuity
 }
 
 export interface ChatMessage {
@@ -150,6 +175,16 @@ export interface ThesisSignal {
   status: 'not_triggered' | 'watching' | 'triggered';
 }
 
+export interface ThesisHistoryEntry {
+  id: string;
+  date: string;
+  changeType: 'scenario_update' | 'signal_update' | 'monitor_update' | 'summary_update';
+  description: string;
+  previousValue?: string;
+  newValue?: string;
+  triggeredBy?: string; // Digest or knowledge entry reference
+}
+
 export interface Thesis {
   id: string;
   name: string;
@@ -158,6 +193,7 @@ export interface Thesis {
   keyMonitors: string[];
   turningPointSignals: ThesisSignal[];
   lastUpdated: string;
+  history?: ThesisHistoryEntry[];
 }
 
 export interface SourceAudit {
@@ -190,4 +226,30 @@ export interface ManualInput {
   author?: string;
   source?: string;
   tags?: string[];
+}
+
+// International market data for global context
+export interface IntlMarketData {
+  // European indices
+  stoxx600?: string;      // e.g., "-1.2%"
+  dax?: string;           // e.g., "-1.1%"
+  ftse?: string;          // e.g., "-0.8%"
+
+  // Asian indices
+  nikkei?: string;        // e.g., "-1.0%"
+  hangSeng?: string;      // e.g., "-0.5%"
+  shanghai?: string;      // e.g., "+0.3%"
+
+  // Currencies
+  dxy?: string;           // e.g., "103.4"
+  eurUsd?: string;        // e.g., "1.0850"
+  usdJpy?: string;        // e.g., "156.20"
+  usdCny?: string;        // e.g., "7.25"
+
+  // Notable movers and events
+  notableMovers?: string; // Free text: "LVMH -4.7%, Rheinmetall +1%"
+  intlEvents?: string;    // Free text: "BOJ meeting Wed-Thu, EU emergency summit"
+
+  // Metadata
+  lastUpdated?: string;   // ISO date string
 }

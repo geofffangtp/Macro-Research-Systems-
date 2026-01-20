@@ -15,16 +15,35 @@ import {
   Users,
   Zap,
   Check,
+  VolumeX,
+  Volume2,
+  ThumbsUp,
+  ThumbsDown,
+  BarChart3,
+  Sparkles,
 } from 'lucide-react';
 
 export function SourcesView() {
-  const { sources, addSource, updateSource, deleteSource, addSourceItem } = useAppStore();
+  const {
+    sources,
+    addSource,
+    updateSource,
+    deleteSource,
+    addSourceItem,
+    muteSourceForToday,
+    unmuteSource,
+    calculateSuggestedWeights,
+  } = useAppStore();
   const [showAddModal, setShowAddModal] = useState(false);
   const [fetchingRss, setFetchingRss] = useState<string | null>(null);
   const [fetchingAll, setFetchingAll] = useState(false);
+  const [showMetrics, setShowMetrics] = useState(false);
 
+  const now = new Date().toISOString();
   const twitterSources = sources.filter((s) => s.platform === 'twitter' && !s.rssUrl);
   const rssSources = sources.filter((s) => s.rssUrl);
+  const mutedSources = sources.filter((s) => s.mutedUntil && s.mutedUntil > now);
+  const sourcesWithSuggestions = sources.filter((s) => s.suggestedWeight && Math.abs(s.suggestedWeight - s.weight) > 0.1);
 
   const fetchRssFeed = async (source: typeof sources[0]) => {
     if (!source.rssUrl) return;
@@ -75,24 +94,25 @@ export function SourcesView() {
   };
 
   return (
-    <div className="mx-auto max-w-6xl">
+    <div className="mx-auto max-w-6xl px-4 sm:px-0">
       {/* Header */}
-      <div className="mb-6 overflow-hidden rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-6 shadow-xl">
-        <div className="flex items-center justify-between">
+      <div className="mb-4 sm:mb-6 overflow-hidden rounded-xl sm:rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4 sm:p-6 shadow-xl">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 mb-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-violet-500">
-                <Users size={16} className="text-white" />
+              <div className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-violet-500">
+                <Users size={14} className="text-white sm:hidden" />
+                <Users size={16} className="text-white hidden sm:block" />
               </div>
-              <span className="text-xs font-medium uppercase tracking-wider text-indigo-400">
+              <span className="text-[10px] sm:text-xs font-medium uppercase tracking-wider text-indigo-400">
                 Information Sources
               </span>
             </div>
-            <h1 className="text-2xl font-bold text-white tracking-tight">
+            <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
               Source Management
             </h1>
-            <p className="mt-1 text-sm text-slate-400">
-              {sources.length} sources tracked • {rssSources.length} with RSS feeds
+            <p className="mt-1 text-xs sm:text-sm text-slate-400">
+              {sources.length} sources • {rssSources.length} RSS feeds
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -100,18 +120,22 @@ export function SourcesView() {
               <button
                 onClick={fetchAllRss}
                 disabled={fetchingAll}
-                className="flex items-center gap-2 rounded-xl bg-white/10 px-4 py-2.5 text-sm font-medium text-white hover:bg-white/20 disabled:opacity-50"
+                className="flex items-center gap-1.5 sm:gap-2 rounded-lg sm:rounded-xl bg-white/10 px-3 sm:px-4 py-2 sm:py-2.5 text-xs sm:text-sm font-medium text-white hover:bg-white/20 disabled:opacity-50"
               >
-                <RefreshCw size={16} className={fetchingAll ? 'animate-spin' : ''} />
-                {fetchingAll ? 'Fetching...' : 'Fetch All RSS'}
+                <RefreshCw size={14} className={`sm:hidden ${fetchingAll ? 'animate-spin' : ''}`} />
+                <RefreshCw size={16} className={`hidden sm:block ${fetchingAll ? 'animate-spin' : ''}`} />
+                <span className="hidden sm:inline">{fetchingAll ? 'Fetching...' : 'Fetch All RSS'}</span>
+                <span className="sm:hidden">{fetchingAll ? '...' : 'Fetch'}</span>
               </button>
             )}
             <button
               onClick={() => setShowAddModal(true)}
-              className="btn-gradient flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-white"
+              className="btn-gradient flex items-center gap-1.5 sm:gap-2 rounded-lg sm:rounded-xl px-3 sm:px-4 py-2 sm:py-2.5 text-xs sm:text-sm font-semibold text-white"
             >
-              <Plus size={16} />
-              Add Source
+              <Plus size={14} className="sm:hidden" />
+              <Plus size={16} className="hidden sm:block" />
+              <span className="hidden sm:inline">Add Source</span>
+              <span className="sm:hidden">Add</span>
             </button>
           </div>
         </div>
@@ -119,21 +143,22 @@ export function SourcesView() {
 
       {/* RSS/Substack Sources */}
       {rssSources.length > 0 && (
-        <div className="mb-6">
-          <div className="mb-4 flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500/10 to-violet-500/10 text-indigo-600 dark:text-indigo-400">
-              <Rss size={16} />
+        <div className="mb-4 sm:mb-6">
+          <div className="mb-3 sm:mb-4 flex items-center gap-2 sm:gap-3">
+            <div className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-lg sm:rounded-xl bg-gradient-to-br from-indigo-500/10 to-violet-500/10 text-indigo-600 dark:text-indigo-400">
+              <Rss size={14} className="sm:hidden" />
+              <Rss size={16} className="hidden sm:block" />
             </div>
             <div>
-              <h3 className="font-semibold text-slate-900 dark:text-white">
-                RSS & Newsletter Sources
+              <h3 className="text-sm sm:text-base font-semibold text-slate-900 dark:text-white">
+                RSS & Newsletters
               </h3>
-              <p className="text-xs text-slate-500">
-                {rssSources.length} sources with auto-fetch capability
+              <p className="text-[10px] sm:text-xs text-slate-500">
+                {rssSources.length} sources with auto-fetch
               </p>
             </div>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
             {rssSources.map((source) => (
               <SourceCard
                 key={source.id}
@@ -142,6 +167,8 @@ export function SourcesView() {
                 onDelete={() => deleteSource(source.id)}
                 onUpdateWeight={(weight) => updateSource(source.id, { weight })}
                 onFetchRss={() => fetchRssFeed(source)}
+                onMute={() => muteSourceForToday(source.id)}
+                onUnmute={() => unmuteSource(source.id)}
                 isFetching={fetchingRss === source.id}
               />
             ))}
@@ -150,21 +177,22 @@ export function SourcesView() {
       )}
 
       {/* Twitter Sources */}
-      <div className="mb-6">
-        <div className="mb-4 flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500/10 to-violet-500/10 text-indigo-600 dark:text-indigo-400">
-            <Twitter size={16} />
+      <div className="mb-4 sm:mb-6">
+        <div className="mb-3 sm:mb-4 flex items-center gap-2 sm:gap-3">
+          <div className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-lg sm:rounded-xl bg-gradient-to-br from-indigo-500/10 to-violet-500/10 text-indigo-600 dark:text-indigo-400">
+            <Twitter size={14} className="sm:hidden" />
+            <Twitter size={16} className="hidden sm:block" />
           </div>
           <div>
-            <h3 className="font-semibold text-slate-900 dark:text-white">
+            <h3 className="text-sm sm:text-base font-semibold text-slate-900 dark:text-white">
               Twitter/X Accounts
             </h3>
-            <p className="text-xs text-slate-500">
-              {twitterSources.length} accounts (manual content input)
+            <p className="text-[10px] sm:text-xs text-slate-500">
+              {twitterSources.length} accounts (manual input)
             </p>
           </div>
         </div>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
           {twitterSources.map((source) => (
             <SourceCard
               key={source.id}
@@ -172,18 +200,123 @@ export function SourcesView() {
               tierColors={tierColors}
               onDelete={() => deleteSource(source.id)}
               onUpdateWeight={(weight) => updateSource(source.id, { weight })}
+              onMute={() => muteSourceForToday(source.id)}
+              onUnmute={() => unmuteSource(source.id)}
             />
           ))}
         </div>
       </div>
 
+      {/* Source Intelligence */}
+      <div className="mb-4 sm:mb-6 rounded-xl sm:rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <div className="flex items-center justify-between mb-3 sm:mb-4">
+          <h3 className="flex items-center gap-2 text-xs sm:text-sm font-semibold text-slate-900 dark:text-white">
+            <Sparkles size={14} className="text-indigo-500 sm:hidden" />
+            <Sparkles size={16} className="text-indigo-500 hidden sm:block" />
+            Source Intelligence
+          </h3>
+          <button
+            onClick={() => {
+              calculateSuggestedWeights();
+              setShowMetrics(true);
+            }}
+            className="flex items-center gap-1 rounded-lg bg-indigo-50 px-2.5 sm:px-3 py-1.5 text-[10px] sm:text-xs font-medium text-indigo-600 hover:bg-indigo-100 dark:bg-indigo-500/20 dark:text-indigo-400 dark:hover:bg-indigo-500/30"
+          >
+            <BarChart3 size={10} className="sm:hidden" />
+            <BarChart3 size={12} className="hidden sm:block" />
+            Analyze
+          </button>
+        </div>
+
+        <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-3">
+          {/* Muted Sources */}
+          <div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-800/50">
+            <div className="flex items-center gap-2 mb-2">
+              <VolumeX size={14} className="text-amber-500" />
+              <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">Muted Today</span>
+            </div>
+            {mutedSources.length === 0 ? (
+              <p className="text-xs text-slate-500">No sources muted</p>
+            ) : (
+              <div className="space-y-1">
+                {mutedSources.map((s) => (
+                  <div key={s.id} className="flex items-center justify-between">
+                    <span className="text-xs text-slate-600 dark:text-slate-400">{s.name}</span>
+                    <button
+                      onClick={() => unmuteSource(s.id)}
+                      className="text-[10px] text-indigo-600 hover:text-indigo-700 dark:text-indigo-400"
+                    >
+                      Unmute
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Weight Suggestions */}
+          <div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-800/50">
+            <div className="flex items-center gap-2 mb-2">
+              <TrendingUp size={14} className="text-emerald-500" />
+              <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">Weight Suggestions</span>
+            </div>
+            {!showMetrics || sourcesWithSuggestions.length === 0 ? (
+              <p className="text-xs text-slate-500">Click &quot;Analyze&quot; to get suggestions</p>
+            ) : (
+              <div className="space-y-1 max-h-24 overflow-y-auto">
+                {sourcesWithSuggestions.slice(0, 5).map((s) => (
+                  <div key={s.id} className="flex items-center justify-between">
+                    <span className="text-xs text-slate-600 dark:text-slate-400 truncate flex-1">{s.name}</span>
+                    <div className="flex items-center gap-1">
+                      <span className="text-[10px] text-slate-400">{s.weight.toFixed(1)}→</span>
+                      <span className="text-[10px] font-semibold text-emerald-600">{s.suggestedWeight?.toFixed(1)}</span>
+                      <button
+                        onClick={() => updateSource(s.id, { weight: s.suggestedWeight!, suggestedWeight: undefined })}
+                        className="text-[10px] text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 ml-1"
+                      >
+                        Apply
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Top Performers */}
+          <div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-800/50">
+            <div className="flex items-center gap-2 mb-2">
+              <ThumbsUp size={14} className="text-indigo-500" />
+              <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">Top Performers</span>
+            </div>
+            {!showMetrics ? (
+              <p className="text-xs text-slate-500">Click &quot;Analyze&quot; to see top sources</p>
+            ) : (
+              <div className="space-y-1">
+                {sources
+                  .filter((s) => s.metrics?.avgRelevanceScore)
+                  .sort((a, b) => (b.metrics?.avgRelevanceScore || 0) - (a.metrics?.avgRelevanceScore || 0))
+                  .slice(0, 3)
+                  .map((s) => (
+                    <div key={s.id} className="flex items-center justify-between">
+                      <span className="text-xs text-slate-600 dark:text-slate-400 truncate flex-1">{s.name}</span>
+                      <span className="text-[10px] font-semibold text-emerald-600">{s.metrics?.avgRelevanceScore?.toFixed(0)}%</span>
+                    </div>
+                  ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
       {/* Weight Legend */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-        <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-white">
-          <Zap size={16} className="text-indigo-500" />
+      <div className="rounded-xl sm:rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <h3 className="mb-3 sm:mb-4 flex items-center gap-2 text-xs sm:text-sm font-semibold text-slate-900 dark:text-white">
+          <Zap size={14} className="text-indigo-500 sm:hidden" />
+          <Zap size={16} className="text-indigo-500 hidden sm:block" />
           Source Tier System
         </h3>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
           <div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-800/50">
             <span className={`inline-block rounded-full px-2.5 py-1 text-xs font-semibold ${tierColors.tier1}`}>
               Tier 1
@@ -244,11 +377,21 @@ interface SourceCardProps {
     platform: string;
     rssUrl?: string;
     lastFetched?: string;
+    mutedUntil?: string;
+    metrics?: {
+      citationCount: number;
+      upvotes: number;
+      downvotes: number;
+      avgRelevanceScore?: number;
+    };
+    suggestedWeight?: number;
   };
   tierColors: Record<string, string>;
   onDelete: () => void;
   onUpdateWeight: (weight: number) => void;
   onFetchRss?: () => void;
+  onMute?: () => void;
+  onUnmute?: () => void;
   isFetching?: boolean;
 }
 
@@ -258,13 +401,29 @@ function SourceCard({
   onDelete,
   onUpdateWeight,
   onFetchRss,
+  onMute,
+  onUnmute,
   isFetching,
 }: SourceCardProps) {
+  const isMuted = source.mutedUntil && source.mutedUntil > new Date().toISOString();
+
   return (
-    <div className="card-hover rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-800/50">
+    <div className={`card-hover rounded-xl border bg-white p-4 dark:bg-slate-800/50 ${
+      isMuted
+        ? 'border-amber-300 opacity-60 dark:border-amber-600'
+        : 'border-slate-200 dark:border-slate-700'
+    }`}>
       <div className="flex items-start justify-between">
         <div className="flex-1 min-w-0">
-          <h4 className="font-semibold text-slate-900 dark:text-white truncate">{source.name}</h4>
+          <div className="flex items-center gap-2">
+            <h4 className="font-semibold text-slate-900 dark:text-white truncate">{source.name}</h4>
+            {isMuted && (
+              <span className="flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-500/20 dark:text-amber-400">
+                <VolumeX size={10} />
+                Muted
+              </span>
+            )}
+          </div>
           <p className="text-xs text-indigo-600 dark:text-indigo-400">@{source.handle}</p>
         </div>
         <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${tierColors[source.tier]}`}>
@@ -272,6 +431,23 @@ function SourceCard({
         </span>
       </div>
       <p className="mt-2 text-xs text-slate-500 line-clamp-2">{source.focus}</p>
+
+      {/* Metrics row */}
+      {source.metrics && (source.metrics.upvotes > 0 || source.metrics.downvotes > 0) && (
+        <div className="mt-2 flex items-center gap-3 text-[10px] text-slate-500">
+          <span className="flex items-center gap-1">
+            <ThumbsUp size={10} className="text-emerald-500" />
+            {source.metrics.upvotes}
+          </span>
+          <span className="flex items-center gap-1">
+            <ThumbsDown size={10} className="text-red-400" />
+            {source.metrics.downvotes}
+          </span>
+          {source.metrics.citationCount > 0 && (
+            <span>Cited {source.metrics.citationCount}x</span>
+          )}
+        </div>
+      )}
 
       {/* Weight indicator */}
       <div className="mt-3 flex items-center gap-2">
@@ -293,10 +469,15 @@ function SourceCard({
             <TrendingUp size={12} />
           </button>
         </div>
+        {source.suggestedWeight && Math.abs(source.suggestedWeight - source.weight) > 0.1 && (
+          <span className="text-[10px] text-emerald-600 dark:text-emerald-400">
+            Suggested: {source.suggestedWeight.toFixed(1)}x
+          </span>
+        )}
       </div>
 
       {/* Actions */}
-      <div className="mt-3 flex items-center gap-2">
+      <div className="mt-3 flex items-center gap-2 flex-wrap">
         {source.platform === 'twitter' && !source.rssUrl && (
           <a
             href={`https://twitter.com/${source.handle}`}
@@ -316,6 +497,25 @@ function SourceCard({
           >
             <RefreshCw size={12} className={isFetching ? 'animate-spin' : ''} />
             {isFetching ? 'Fetching...' : 'Fetch'}
+          </button>
+        )}
+        {/* Mute/Unmute button */}
+        {isMuted ? (
+          <button
+            onClick={onUnmute}
+            className="flex items-center gap-1 rounded-lg bg-amber-50 px-2.5 py-1.5 text-xs font-medium text-amber-600 hover:bg-amber-100 dark:bg-amber-500/20 dark:text-amber-400 dark:hover:bg-amber-500/30"
+          >
+            <Volume2 size={12} />
+            Unmute
+          </button>
+        ) : (
+          <button
+            onClick={onMute}
+            className="flex items-center gap-1 rounded-lg bg-slate-100 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-400 dark:hover:bg-slate-600"
+            title="Mute for today"
+          >
+            <VolumeX size={12} />
+            Mute
           </button>
         )}
         <button
@@ -373,14 +573,14 @@ function AddSourceModal({ onClose, onSave }: AddSourceModalProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl dark:bg-slate-900">
-        <h3 className="mb-4 text-lg font-semibold text-slate-900 dark:text-white">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm">
+      <div className="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl bg-white p-4 sm:p-6 shadow-xl dark:bg-slate-900 max-h-[90vh] overflow-y-auto">
+        <h3 className="mb-4 text-base sm:text-lg font-semibold text-slate-900 dark:text-white">
           Add Source
         </h3>
 
         {/* Platform selector */}
-        <div className="mb-4 flex gap-2">
+        <div className="mb-4 flex flex-wrap gap-2">
           <button
             type="button"
             onClick={() => setPlatform('twitter')}

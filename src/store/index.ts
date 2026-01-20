@@ -12,6 +12,9 @@ import {
   ChatSession,
   ChatMessage,
   Thesis,
+  ThesisHistoryEntry,
+  OpenThread,
+  IntlMarketData,
 } from '@/types';
 import { initialSources, initialDataReleases, initialThesis } from '@/lib/initial-data';
 import * as db from '@/lib/supabase-service';
@@ -31,6 +34,12 @@ interface AppState {
   updateSourceItem: (id: string, updates: Partial<SourceItem>) => void;
   rateSourceItem: (id: string, rating: 'up' | 'down') => void;
   flagSourceItem: (id: string, flagged: boolean) => void;
+  // Source intelligence
+  muteSourceForToday: (sourceId: string) => void;
+  unmuteSource: (sourceId: string) => void;
+  incrementSourceCitation: (sourceId: string) => void;
+  calculateSuggestedWeights: () => void;
+  getActiveSourceItems: () => SourceItem[]; // Excludes muted sources
 
   // Data Releases
   dataReleases: DataRelease[];
@@ -52,6 +61,10 @@ interface AppState {
   currentDigest: Digest | null;
   addDigest: (digest: Omit<Digest, 'id'>) => void;
   setCurrentDigest: (digest: Digest | null) => void;
+  // Open threads
+  getRecentOpenThreads: (days?: number) => OpenThread[];
+  resolveThread: (threadId: string, resolvedBy?: string) => void;
+  addOpenThreadsToDigest: (digestId: string, threads: Omit<OpenThread, 'id'>[]) => void;
 
   // Chat
   chatSessions: ChatSession[];
@@ -63,6 +76,14 @@ interface AppState {
   // Thesis
   thesis: Thesis | null;
   updateThesis: (updates: Partial<Thesis>) => void;
+  addThesisHistoryEntry: (entry: Omit<ThesisHistoryEntry, 'id' | 'date'>) => void;
+  updateThesisSignalStatus: (phase: number, status: 'not_triggered' | 'watching' | 'triggered', triggeredBy?: string) => void;
+  updateScenarioProbability: (scenarioName: string, probability: number, triggeredBy?: string) => void;
+
+  // International Market Data
+  intlMarketData: IntlMarketData;
+  setIntlMarketData: (data: Partial<IntlMarketData>) => void;
+  clearIntlMarketData: () => void;
 
   // UI State
   sidebarOpen: boolean;
@@ -91,6 +112,7 @@ export const useAppStore = create<AppState>()(
       chatSessions: [],
       activeChatSession: null,
       thesis: null,
+      intlMarketData: {},
       sidebarOpen: true,
       activeView: 'digest',
       isLoading: false,
@@ -280,6 +302,99 @@ export const useAppStore = create<AppState>()(
         }
       },
 
+      // Source intelligence functions
+      muteSourceForToday: (sourceId) => {
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        tomorrow.setHours(0, 0, 0, 0);
+
+        get().updateSource(sourceId, { mutedUntil: tomorrow.toISOString() });
+      },
+
+      unmuteSource: (sourceId) => {
+        get().updateSource(sourceId, { mutedUntil: undefined });
+      },
+
+      incrementSourceCitation: (sourceId) => {
+        const source = get().sources.find((s) => s.id === sourceId);
+        if (!source) return;
+
+        const currentMetrics = source.metrics || { citationCount: 0, upvotes: 0, downvotes: 0 };
+        get().updateSource(sourceId, {
+          metrics: {
+            ...currentMetrics,
+            citationCount: currentMetrics.citationCount + 1,
+            lastCitedDate: new Date().toISOString(),
+          },
+        });
+      },
+
+      calculateSuggestedWeights: () => {
+        const state = get();
+        const updates: { id: string; suggestedWeight: number }[] = [];
+
+        for (const source of state.sources) {
+          // Get all items from this source
+          const sourceItems = state.sourceItems.filter((i) => i.sourceId === source.id);
+          if (sourceItems.length === 0) continue;
+
+          // Calculate metrics
+          const upvotes = sourceItems.filter((i) => i.userRating === 'up').length;
+          const downvotes = sourceItems.filter((i) => i.userRating === 'down').length;
+          const totalRated = upvotes + downvotes;
+
+          if (totalRated < 3) continue; // Need enough data
+
+          const metrics = source.metrics || { citationCount: 0, upvotes: 0, downvotes: 0 };
+
+          // Calculate score: (upvotes - downvotes) / total + citation bonus
+          const ratingScore = (upvotes - downvotes) / totalRated; // -1 to 1
+          const citationBonus = Math.min(metrics.citationCount * 0.02, 0.2); // Up to 0.2 bonus
+
+          // Convert to weight (0.1 to 2.0)
+          // Base: 1.0, adjustment: -0.5 to +0.5 from rating, +0.2 max from citations
+          const suggestedWeight = Math.max(
+            0.1,
+            Math.min(2.0, 1.0 + ratingScore * 0.5 + citationBonus)
+          );
+
+          // Only suggest if different from current
+          if (Math.abs(suggestedWeight - source.weight) > 0.1) {
+            updates.push({ id: source.id, suggestedWeight });
+          }
+
+          // Update metrics
+          get().updateSource(source.id, {
+            metrics: {
+              ...metrics,
+              upvotes,
+              downvotes,
+              avgRelevanceScore: totalRated > 0 ? (upvotes / totalRated) * 100 : undefined,
+            },
+          });
+        }
+
+        // Apply suggestions
+        for (const update of updates) {
+          get().updateSource(update.id, { suggestedWeight: update.suggestedWeight });
+        }
+      },
+
+      getActiveSourceItems: () => {
+        const state = get();
+        const now = new Date().toISOString();
+
+        // Get IDs of muted sources
+        const mutedSourceIds = new Set(
+          state.sources
+            .filter((s) => s.mutedUntil && s.mutedUntil > now)
+            .map((s) => s.id)
+        );
+
+        // Filter out items from muted sources
+        return state.sourceItems.filter((item) => !mutedSourceIds.has(item.sourceId));
+      },
+
       // Data Release actions
       updateDataRelease: (id, updates) => {
         let updatedRelease: DataRelease | undefined;
@@ -401,6 +516,92 @@ export const useAppStore = create<AppState>()(
         set({ currentDigest: digest });
       },
 
+      getRecentOpenThreads: (days = 7) => {
+        const cutoffDate = new Date();
+        cutoffDate.setDate(cutoffDate.getDate() - days);
+        const cutoffStr = cutoffDate.toISOString();
+
+        const state = get();
+        const threads: OpenThread[] = [];
+
+        // Collect open threads from recent digests
+        for (const digest of state.digests) {
+          if (digest.generatedAt < cutoffStr) continue;
+          if (!digest.openThreads) continue;
+
+          for (const thread of digest.openThreads) {
+            if (thread.status === 'open') {
+              threads.push(thread);
+            }
+          }
+        }
+
+        // Sort by creation date (most recent first) and dedupe
+        return threads
+          .sort((a, b) => new Date(b.createdDate).getTime() - new Date(a.createdDate).getTime())
+          .slice(0, 10); // Limit to 10 most recent
+      },
+
+      resolveThread: (threadId, resolvedBy) => {
+        let updatedDigest: Digest | undefined;
+
+        set((state) => {
+          const digests = state.digests.map((digest) => {
+            if (!digest.openThreads) return digest;
+
+            const threadIndex = digest.openThreads.findIndex((t) => t.id === threadId);
+            if (threadIndex === -1) return digest;
+
+            const updatedThreads = [...digest.openThreads];
+            updatedThreads[threadIndex] = {
+              ...updatedThreads[threadIndex],
+              status: 'resolved',
+              resolvedDate: new Date().toISOString(),
+              resolvedBy,
+            };
+
+            updatedDigest = { ...digest, openThreads: updatedThreads };
+            return updatedDigest;
+          });
+
+          return { digests };
+        });
+
+        if (get().isSupabaseConnected && updatedDigest) {
+          db.saveDigest(updatedDigest).catch((err) => console.error('Failed to save resolved thread:', err));
+        }
+      },
+
+      addOpenThreadsToDigest: (digestId, threads) => {
+        let updatedDigest: Digest | undefined;
+
+        set((state) => {
+          const digests = state.digests.map((digest) => {
+            if (digest.id !== digestId) return digest;
+
+            const newThreads: OpenThread[] = threads.map((t) => ({
+              ...t,
+              id: generateId(),
+            }));
+
+            updatedDigest = {
+              ...digest,
+              openThreads: [...(digest.openThreads || []), ...newThreads],
+            };
+            return updatedDigest;
+          });
+
+          return {
+            digests,
+            currentDigest: state.currentDigest?.id === digestId ? updatedDigest : state.currentDigest,
+          };
+        });
+
+        if (get().isSupabaseConnected && updatedDigest) {
+          db.saveDigest(updatedDigest).catch((err) => console.error('Failed to save open threads:', err));
+        }
+      },
+
       // Chat actions
       createChatSession: (title, contextType, contextId) => {
         const newSession: ChatSession = {
@@ -486,6 +687,91 @@ export const useAppStore = create<AppState>()(
         }
       },
 
+      addThesisHistoryEntry: (entry) => {
+        const newEntry: ThesisHistoryEntry = {
+          ...entry,
+          id: generateId(),
+          date: new Date().toISOString(),
+        };
+
+        let updatedThesis: Thesis | null = null;
+        set((state) => {
+          if (state.thesis) {
+            const history = state.thesis.history || [];
+            updatedThesis = {
+              ...state.thesis,
+              history: [newEntry, ...history].slice(0, 50), // Keep last 50 entries
+              lastUpdated: new Date().toISOString(),
+            };
+            return { thesis: updatedThesis };
+          }
+          return {};
+        });
+
+        if (get().isSupabaseConnected && updatedThesis) {
+          db.saveThesis(updatedThesis).catch((err) => console.error('Failed to save thesis history:', err));
+        }
+      },
+
+      updateThesisSignalStatus: (phase, status, triggeredBy) => {
+        const state = get();
+        if (!state.thesis) return;
+
+        const signal = state.thesis.turningPointSignals.find((s) => s.phase === phase);
+        if (!signal || signal.status === status) return;
+
+        const previousStatus = signal.status;
+        const updatedSignals = state.thesis.turningPointSignals.map((s) =>
+          s.phase === phase ? { ...s, status } : s
+        );
+
+        get().updateThesis({ turningPointSignals: updatedSignals });
+        get().addThesisHistoryEntry({
+          changeType: 'signal_update',
+          description: `Phase ${phase} (${signal.name}): ${previousStatus} → ${status}`,
+          previousValue: previousStatus,
+          newValue: status,
+          triggeredBy,
+        });
+      },
+
+      updateScenarioProbability: (scenarioName, probability, triggeredBy) => {
+        const state = get();
+        if (!state.thesis) return;
+
+        const scenario = state.thesis.scenarios.find((s) => s.name === scenarioName);
+        if (!scenario || scenario.probability === probability) return;
+
+        const previousProbability = scenario.probability;
+        const updatedScenarios = state.thesis.scenarios.map((s) =>
+          s.name === scenarioName ? { ...s, probability } : s
+        );
+
+        get().updateThesis({ scenarios: updatedScenarios });
+        get().addThesisHistoryEntry({
+          changeType: 'scenario_update',
+          description: `${scenarioName}: ${previousProbability}% → ${probability}%`,
+          previousValue: `${previousProbability}%`,
+          newValue: `${probability}%`,
+          triggeredBy,
+        });
+      },
+
+      // International market data actions
+      setIntlMarketData: (data) => {
+        set((state) => ({
+          intlMarketData: {
+            ...state.intlMarketData,
+            ...data,
+            lastUpdated: new Date().toISOString(),
+          },
+        }));
+      },
+
+      clearIntlMarketData: () => {
+        set({ intlMarketData: {} });
+      },
+
       // UI actions
       setSidebarOpen: (open) => {
         set({ sidebarOpen: open });
@@ -537,6 +823,7 @@ export const useAppStore = create<AppState>()(
         digests: state.digests,
         chatSessions: state.chatSessions,
         thesis: state.thesis,
+        intlMarketData: state.intlMarketData,
       }),
     }
   )
