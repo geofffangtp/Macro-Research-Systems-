@@ -167,6 +167,8 @@ When today's content resolves or updates one of these threads, call it out expli
 
   const prompt = `You are a macro research analyst writing a substantive daily digest. This should be 15 minutes of valuable reading, not 2 minutes of headlines.
 
+IMPORTANT: Today's date is ${today}. Use this EXACT date in the header. Do not change or infer a different date.
+
 # MACRO DIGEST - ${today}
 
 ---
@@ -469,6 +471,89 @@ Be concise but thorough.`,
 
   const textBlock = response.content.find((block) => block.type === 'text');
   return textBlock ? textBlock.text : '';
+}
+
+export interface ExtractedKnowledge {
+  topic: string;
+  thesisImpact: string;
+  keyInsights: string[];
+  conclusion: string;
+  catalystToWatch?: string;
+  tags: string[];
+  status: 'open' | 'closed' | 'watching';
+}
+
+export async function extractKnowledgeFromChat(
+  assistantMessage: string,
+  userMessage: string,
+  existingTopics: string[],
+  thesisContext?: string
+): Promise<ExtractedKnowledge> {
+  const prompt = `You are extracting a knowledge base entry from a research conversation.
+
+User's question:
+${userMessage}
+
+Assistant's response (the insight to save):
+${assistantMessage}
+
+${thesisContext ? `User's thesis context:\n${thesisContext}\n` : ''}
+
+Existing topics in knowledge base (use existing topic if relevant, or create new one):
+${existingTopics.length > 0 ? existingTopics.join(', ') : 'None yet'}
+
+Extract a structured knowledge entry. Be concise but capture the key insight:
+
+Respond ONLY with valid JSON (no markdown code blocks):
+{
+  "topic": "string - short topic name (2-4 words)",
+  "thesisImpact": "string - one sentence on how this affects the investment thesis",
+  "keyInsights": ["string array - 2-4 key takeaways, each one sentence"],
+  "conclusion": "string - the main conclusion or actionable insight (1-2 sentences)",
+  "catalystToWatch": "string or null - specific event/data to watch that would update this view",
+  "tags": ["string array - 2-4 relevant tags"],
+  "status": "watching" | "open" | "closed" - use 'watching' if there's an active catalyst, 'open' if more research needed, 'closed' if concluded
+}`;
+
+  const response = await anthropic.messages.create({
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: 1000,
+    messages: [{ role: 'user', content: prompt }],
+  });
+
+  const textBlock = response.content.find((block) => block.type === 'text');
+  if (textBlock) {
+    try {
+      const parsed = JSON.parse(textBlock.text);
+      return {
+        topic: parsed.topic || 'Uncategorized',
+        thesisImpact: parsed.thesisImpact || 'Unknown impact',
+        keyInsights: Array.isArray(parsed.keyInsights) ? parsed.keyInsights : [assistantMessage.slice(0, 200)],
+        conclusion: parsed.conclusion || assistantMessage.slice(0, 300),
+        catalystToWatch: parsed.catalystToWatch || undefined,
+        tags: Array.isArray(parsed.tags) ? parsed.tags : [],
+        status: ['watching', 'open', 'closed'].includes(parsed.status) ? parsed.status : 'open',
+      };
+    } catch {
+      // Fallback if JSON parsing fails
+      return {
+        topic: 'Uncategorized',
+        thesisImpact: 'Unknown impact',
+        keyInsights: [assistantMessage.slice(0, 200)],
+        conclusion: assistantMessage.slice(0, 300),
+        tags: [],
+        status: 'open',
+      };
+    }
+  }
+  return {
+    topic: 'Uncategorized',
+    thesisImpact: 'Unknown impact',
+    keyInsights: [assistantMessage.slice(0, 200)],
+    conclusion: assistantMessage.slice(0, 300),
+    tags: [],
+    status: 'open',
+  };
 }
 
 export async function analyzeForKnowledgeBase(

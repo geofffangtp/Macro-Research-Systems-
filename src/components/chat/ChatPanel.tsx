@@ -1,8 +1,10 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Send, Loader2, MessageSquare, Sparkles, Globe, ChevronDown, ChevronUp, X } from 'lucide-react';
+import { Send, Loader2, MessageSquare, Sparkles, Globe, ChevronDown, ChevronUp, X, BookmarkPlus, Save, Maximize2, Minimize2 } from 'lucide-react';
 import { useAppStore } from '@/store';
+import { SaveToKBModal } from './SaveToKBModal';
+import { SaveConversationModal } from './SaveConversationModal';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -17,7 +19,12 @@ const QUICK_ACTIONS = [
   { label: "Second-order effects", prompt: "What are the second-order effects of today's main stories that I might be missing?" },
 ];
 
-export function ChatPanel() {
+interface ChatPanelProps {
+  isExpanded?: boolean;
+  onToggleExpand?: () => void;
+}
+
+export function ChatPanel({ isExpanded = false, onToggleExpand }: ChatPanelProps) {
   const {
     thesis,
     currentDigest,
@@ -35,8 +42,43 @@ export function ChatPanel() {
   const [isLoading, setIsLoading] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [showContext, setShowContext] = useState(false);
+  const [hoveredMessageIndex, setHoveredMessageIndex] = useState<number | null>(null);
+  const [saveModalOpen, setSaveModalOpen] = useState(false);
+  const [saveConversationModalOpen, setSaveConversationModalOpen] = useState(false);
+  const [messageToSave, setMessageToSave] = useState<{ assistant: string; user: string } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // Handle save to KB - find the preceding user message
+  const handleSaveToKB = (assistantIndex: number) => {
+    const assistantMessage = messages[assistantIndex];
+    // Find the most recent user message before this assistant message
+    let userMessage = '';
+    for (let i = assistantIndex - 1; i >= 0; i--) {
+      if (messages[i].role === 'user') {
+        userMessage = messages[i].content;
+        break;
+      }
+    }
+    setMessageToSave({ assistant: assistantMessage.content, user: userMessage });
+    setSaveModalOpen(true);
+  };
+
+  // Handle save entire conversation
+  const handleSaveConversation = () => {
+    if (messages.length >= 2) {
+      setSaveConversationModalOpen(true);
+    }
+  };
+
+  // Clear chat after saving to KB
+  const handleClearChat = () => {
+    setMessages([]);
+    // Create a new session for continued chatting
+    const today = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const newSession = createChatSession(`Research Session - ${today} (continued)`, 'general', currentDigest?.id);
+    setActiveChatSession(newSession);
+  };
 
   // Get or create today's chat session
   const getTodaySession = useCallback(() => {
@@ -241,6 +283,27 @@ export function ChatPanel() {
           </div>
         </div>
         <div className="flex items-center gap-1">
+          {/* Save Conversation Button */}
+          {messages.length >= 2 && (
+            <button
+              onClick={handleSaveConversation}
+              className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-indigo-600 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-900/20"
+              title="Save entire conversation to Knowledge Base"
+            >
+              <Save size={14} />
+              <span className="hidden sm:inline">Save Chat</span>
+            </button>
+          )}
+          {/* Expand/Collapse Button */}
+          {onToggleExpand && (
+            <button
+              onClick={onToggleExpand}
+              className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800"
+              title={isExpanded ? 'Collapse chat' : 'Expand chat'}
+            >
+              {isExpanded ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+            </button>
+          )}
           <button
             onClick={() => setShowContext(!showContext)}
             className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800"
@@ -302,7 +365,7 @@ export function ChatPanel() {
             {/* Quick actions */}
             <div className="space-y-2">
               <p className="text-xs font-medium text-slate-500 text-center">Quick prompts:</p>
-              <div className="grid grid-cols-2 gap-2">
+              <div className={`grid gap-2 ${isExpanded ? 'grid-cols-4' : 'grid-cols-2'}`}>
                 {QUICK_ACTIONS.map((action, i) => (
                   <button
                     key={i}
@@ -321,15 +384,31 @@ export function ChatPanel() {
           <div
             key={i}
             className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+            onMouseEnter={() => msg.role === 'assistant' && setHoveredMessageIndex(i)}
+            onMouseLeave={() => setHoveredMessageIndex(null)}
           >
-            <div
-              className={`max-w-[85%] rounded-2xl px-4 py-2.5 ${
-                msg.role === 'user'
-                  ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white'
-                  : 'bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-white'
-              }`}
-            >
-              <p className="text-sm whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+            <div className="relative group">
+              <div
+                className={`rounded-2xl px-4 py-2.5 ${
+                  isExpanded ? 'max-w-[80%]' : 'max-w-[85%]'
+                } ${
+                  msg.role === 'user'
+                    ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white'
+                    : 'bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-white'
+                }`}
+              >
+                <p className="text-sm whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+              </div>
+              {/* Save to KB button - only on assistant messages */}
+              {msg.role === 'assistant' && hoveredMessageIndex === i && (
+                <button
+                  onClick={() => handleSaveToKB(i)}
+                  className="absolute -right-2 -top-2 flex h-7 w-7 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg hover:bg-emerald-600 transition-all"
+                  title="Save to Knowledge Base"
+                >
+                  <BookmarkPlus size={14} />
+                </button>
+              )}
             </div>
           </div>
         ))}
@@ -356,7 +435,7 @@ export function ChatPanel() {
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Ask about the digest, thesis, or market developments..."
-            rows={1}
+            rows={isExpanded ? 2 : 1}
             className="flex-1 resize-none rounded-xl border border-slate-300 px-4 py-2.5 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
           />
           <button
@@ -371,6 +450,25 @@ export function ChatPanel() {
           Press Enter to send • Shift+Enter for new line
         </p>
       </div>
+
+      {/* Save to KB Modal (single message) */}
+      <SaveToKBModal
+        isOpen={saveModalOpen}
+        onClose={() => {
+          setSaveModalOpen(false);
+          setMessageToSave(null);
+        }}
+        assistantMessage={messageToSave?.assistant || ''}
+        userMessage={messageToSave?.user || ''}
+      />
+
+      {/* Save Conversation Modal (entire conversation) */}
+      <SaveConversationModal
+        isOpen={saveConversationModalOpen}
+        onClose={() => setSaveConversationModalOpen(false)}
+        messages={messages}
+        onSaveComplete={handleClearChat}
+      />
     </div>
   );
 }

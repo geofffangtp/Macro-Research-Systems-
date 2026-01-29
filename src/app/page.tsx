@@ -11,11 +11,13 @@ import { DataReleasesView } from '@/components/sources/DataReleasesView';
 import { PredictionsView } from '@/components/sources/PredictionsView';
 import { SettingsView } from '@/components/sources/SettingsView';
 import { ChatPanel } from '@/components/chat/ChatPanel';
+import { DigestPreview } from '@/components/chat/DigestPreview';
 
 export default function Home() {
   const { activeView, sidebarOpen, initializeData, loadFromSupabase, isLoading, isSupabaseConnected } = useAppStore();
   const [initialized, setInitialized] = useState(false);
   const [showChatPanel, setShowChatPanel] = useState(true);
+  const [isChatExpanded, setIsChatExpanded] = useState(false);
 
   useEffect(() => {
     const init = async () => {
@@ -52,6 +54,16 @@ export default function Home() {
 
   // Only show chat panel on digest view
   const shouldShowChat = activeView === 'digest' && showChatPanel;
+
+  // Handle toggling expanded chat
+  const handleToggleExpand = () => {
+    setIsChatExpanded(!isChatExpanded);
+  };
+
+  // Handle returning to full digest view from preview
+  const handleExpandDigest = () => {
+    setIsChatExpanded(false);
+  };
 
   // Show loading screen while initializing
   if (!initialized || isLoading) {
@@ -103,19 +115,41 @@ export default function Home() {
           sidebarOpen ? 'pl-64' : 'pl-16'
         }`}
       >
-        <div className={`flex ${shouldShowChat ? 'gap-6' : ''} px-6 pb-8`}>
-          {/* Main content - digest or other views */}
-          <div className={shouldShowChat ? 'flex-1 min-w-0' : 'w-full'}>
-            {renderView()}
-          </div>
-
-          {/* Persistent chat panel - only on digest view */}
-          {shouldShowChat && (
-            <div className="w-[400px] flex-shrink-0 sticky top-24 h-[calc(100vh-120px)]">
-              <ChatPanel />
+        {/* Expanded Chat Mode: 70% chat / 30% digest preview */}
+        {shouldShowChat && isChatExpanded ? (
+          <div className="flex gap-4 px-6 pb-8 h-[calc(100vh-80px)]">
+            {/* Digest Preview - 30% */}
+            <div className="w-[30%] min-w-[280px] max-w-[400px] flex-shrink-0">
+              <DigestPreview onExpandDigest={handleExpandDigest} />
             </div>
-          )}
-        </div>
+
+            {/* Chat Panel - 70% */}
+            <div className="flex-1 min-w-0">
+              <ChatPanel
+                isExpanded={true}
+                onToggleExpand={handleToggleExpand}
+              />
+            </div>
+          </div>
+        ) : (
+          /* Normal Mode: Full digest with chat sidebar */
+          <div className={`flex ${shouldShowChat ? 'gap-6' : ''} px-6 pb-8`}>
+            {/* Main content - digest or other views */}
+            <div className={shouldShowChat ? 'flex-1 min-w-0' : 'w-full'}>
+              {renderView()}
+            </div>
+
+            {/* Persistent chat panel - only on digest view */}
+            {shouldShowChat && (
+              <div className="w-[400px] flex-shrink-0 sticky top-24 h-[calc(100vh-120px)]">
+                <ChatPanel
+                  isExpanded={false}
+                  onToggleExpand={handleToggleExpand}
+                />
+              </div>
+            )}
+          </div>
+        )}
       </main>
     </div>
   );

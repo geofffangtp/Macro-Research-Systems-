@@ -31,7 +31,9 @@ import {
   X,
   ChevronLeft,
 } from 'lucide-react';
-import { InternationalDataInput } from '@/components/ui/InternationalDataInput';
+import { DigestContent } from './DigestContent';
+import { MarketTickerCompact } from '@/components/ui/MarketTicker';
+import { CatalystsCalendar } from '@/components/ui/CatalystsCalendar';
 
 // Helper to dispatch discuss event to the chat panel
 function dispatchDiscussEvent(item: { title: string; content: string; source?: string }) {
@@ -269,125 +271,59 @@ export function DigestView() {
 
   return (
     <div className="mx-auto max-w-4xl px-4 sm:px-0">
-      {/* Hero Header */}
-      <div className="mb-4 sm:mb-6 overflow-hidden rounded-xl sm:rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4 sm:p-6 shadow-xl">
-        <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/10 via-transparent to-violet-500/10 pointer-events-none" />
-        <div className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <div className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-violet-500">
-                <Zap size={14} className="text-white sm:hidden" />
-                <Zap size={16} className="text-white hidden sm:block" />
-              </div>
-              <span className="text-[10px] sm:text-xs font-medium uppercase tracking-wider text-indigo-400">
-                Daily Intelligence
-              </span>
+      {/* Compact Header */}
+      <div className="mb-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        {/* Top Row: Title + Actions */}
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-violet-500">
+              <Zap size={20} className="text-white" />
             </div>
-            <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
-              Macro Digest
-            </h1>
-            <div className="mt-2 flex flex-wrap items-center gap-2 sm:gap-3 text-xs sm:text-sm text-slate-400">
-              <span className="flex items-center gap-1">
-                <Calendar size={12} className="sm:hidden" />
-                <Calendar size={14} className="hidden sm:block" />
-                <span className="hidden sm:inline">{today}</span>
-                <span className="sm:hidden">{new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
-              </span>
-              <span className="h-1 w-1 rounded-full bg-slate-600" />
-              <span className="flex items-center gap-1">
-                <BarChart3 size={12} className="sm:hidden" />
-                <BarChart3 size={14} className="hidden sm:block" />
-                {sourceItems.length} sources
-              </span>
+            <div>
+              <h1 className="text-lg font-bold text-slate-900 dark:text-white">
+                Macro Digest
+              </h1>
+              <p className="text-xs text-slate-500">{today}</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
             {digests.length > 0 && (
               <button
                 onClick={() => setShowDigestHistory(true)}
-                className="flex items-center gap-1.5 sm:gap-2 rounded-lg sm:rounded-xl bg-white/10 px-3 sm:px-4 py-2 sm:py-2.5 text-xs sm:text-sm font-medium text-white hover:bg-white/20"
+                className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800"
               >
-                <Clock size={14} className="sm:hidden" />
-                <Clock size={16} className="hidden sm:block" />
-                <span className="hidden sm:inline">History ({digests.length})</span>
-                <span className="sm:hidden">{digests.length}</span>
+                <History size={14} />
+                History ({digests.length})
               </button>
             )}
             <button
               onClick={generateDigest}
               disabled={isGenerating}
-              className="btn-gradient flex items-center gap-1.5 sm:gap-2 rounded-lg sm:rounded-xl px-3 sm:px-5 py-2 sm:py-2.5 text-xs sm:text-sm font-semibold text-white disabled:opacity-50"
+              className="flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-indigo-600 to-violet-600 px-4 py-2 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-50"
             >
-              <RefreshCw size={14} className={`sm:hidden ${isGenerating ? 'animate-spin' : ''}`} />
-              <RefreshCw size={16} className={`hidden sm:block ${isGenerating ? 'animate-spin' : ''}`} />
-              {isGenerating ? 'Generating...' : 'Generate'}
+              <RefreshCw size={14} className={isGenerating ? 'animate-spin' : ''} />
+              {isGenerating ? 'Generating...' : 'Generate Digest'}
             </button>
           </div>
         </div>
 
-        {/* International Market Data Input */}
-        <div className="mt-4 sm:mt-6">
-          <InternationalDataInput />
-        </div>
-
-        {/* Quick Stats */}
-        <div className="mt-4 sm:mt-6 grid grid-cols-3 gap-2 sm:gap-4">
-          <div className="rounded-lg sm:rounded-xl bg-white/5 p-2.5 sm:p-4 backdrop-blur">
-            <p className="text-[10px] sm:text-xs font-medium text-slate-400">Content</p>
-            <p className="mt-0.5 sm:mt-1 text-lg sm:text-2xl font-bold text-white">{sourceItems.length}</p>
-            <p className="text-[10px] sm:text-xs text-indigo-400 hidden sm:block">+12 from yesterday</p>
-          </div>
-          <div className="rounded-lg sm:rounded-xl bg-white/5 p-2.5 sm:p-4 backdrop-blur">
-            <p className="text-[10px] sm:text-xs font-medium text-slate-400">Releases</p>
-            <p className="mt-0.5 sm:mt-1 text-lg sm:text-2xl font-bold text-white">{dataReleases.length}</p>
-            <p className="text-[10px] sm:text-xs text-slate-400 hidden sm:block">Tracked indicators</p>
-          </div>
-          <div className="rounded-lg sm:rounded-xl bg-white/5 p-2.5 sm:p-4 backdrop-blur">
-            <p className="text-[10px] sm:text-xs font-medium text-slate-400">Thesis</p>
-            <p className="mt-0.5 sm:mt-1 text-lg sm:text-2xl font-bold text-indigo-400">Active</p>
-            <p className="text-[10px] sm:text-xs text-slate-400 hidden sm:block">3 signals watching</p>
-          </div>
+        {/* Market Ticker */}
+        <div className="pt-3 border-t border-slate-100 dark:border-slate-800">
+          <MarketTickerCompact />
         </div>
       </div>
 
       {/* Generated Content */}
       {generatedContent && (
-        <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          <div className="prose prose-slate dark:prose-invert max-w-none">
-            {generatedContent.split('\n').map((line, i) => {
-              if (line.startsWith('## ')) {
-                return (
-                  <h2 key={i} className="mt-6 text-lg font-semibold text-slate-900 dark:text-white">
-                    {line.replace('## ', '')}
-                  </h2>
-                );
-              }
-              if (line.startsWith('### ')) {
-                return (
-                  <h3 key={i} className="mt-4 text-md font-medium text-slate-800 dark:text-slate-200">
-                    {line.replace('### ', '')}
-                  </h3>
-                );
-              }
-              if (line.startsWith('- ')) {
-                return (
-                  <li key={i} className="ml-4 text-slate-600 dark:text-slate-400">
-                    {line.replace('- ', '')}
-                  </li>
-                );
-              }
-              if (line.trim()) {
-                return (
-                  <p key={i} className="text-slate-600 dark:text-slate-400">
-                    {line}
-                  </p>
-                );
-              }
-              return null;
-            })}
-          </div>
+        <div className="mb-6">
+          <DigestContent content={generatedContent} />
         </div>
       )}
+
+      {/* Catalysts Calendar */}
+      <div className="mb-6">
+        <CatalystsCalendar />
+      </div>
 
       {/* Recent Items */}
       <DigestSection
@@ -860,39 +796,7 @@ export function DigestView() {
 
                   {/* Raw Content */}
                   {historyDigest.rawContent ? (
-                    <div className="prose prose-slate dark:prose-invert max-w-none">
-                      {historyDigest.rawContent.split('\n').map((line, i) => {
-                        if (line.startsWith('## ')) {
-                          return (
-                            <h2 key={i} className="mt-6 text-lg font-semibold text-slate-900 dark:text-white">
-                              {line.replace('## ', '')}
-                            </h2>
-                          );
-                        }
-                        if (line.startsWith('### ')) {
-                          return (
-                            <h3 key={i} className="mt-4 text-md font-medium text-slate-800 dark:text-slate-200">
-                              {line.replace('### ', '')}
-                            </h3>
-                          );
-                        }
-                        if (line.startsWith('- ')) {
-                          return (
-                            <li key={i} className="ml-4 text-slate-600 dark:text-slate-400">
-                              {line.replace('- ', '')}
-                            </li>
-                          );
-                        }
-                        if (line.trim()) {
-                          return (
-                            <p key={i} className="text-slate-600 dark:text-slate-400">
-                              {line}
-                            </p>
-                          );
-                        }
-                        return null;
-                      })}
-                    </div>
+                    <DigestContent content={historyDigest.rawContent} />
                   ) : (
                     <p className="text-sm text-slate-500">
                       No content saved for this digest.

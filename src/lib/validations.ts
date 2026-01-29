@@ -124,6 +124,14 @@ export const knowledgeAnalyzeSchema = z.object({
   existingTopics: z.array(z.string().max(200)).max(100).optional(),
 });
 
+// Extract knowledge from chat schema
+export const knowledgeExtractFromChatSchema = z.object({
+  assistantMessage: z.string().min(1).max(50000),
+  userMessage: z.string().min(1).max(10000),
+  existingTopics: z.array(z.string().max(200)).max(100).optional(),
+  thesisContext: z.string().max(5000).optional(),
+});
+
 // Reset endpoint schema - with valid reset types
 export const resetRequestSchema = z.object({
   resetType: z.enum(['all', 'sources', 'data_releases', 'knowledge', 'predictions', 'digests', 'chat', 'thesis']),
