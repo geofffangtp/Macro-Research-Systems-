@@ -97,6 +97,7 @@ CREATE TABLE IF NOT EXISTS digests (
   date DATE NOT NULL,
   type TEXT DEFAULT 'daily',
   sections JSONB,
+  raw_content TEXT,
   market_activity TEXT DEFAULT 'moderate',
   generated_at TIMESTAMPTZ DEFAULT NOW(),
   reading_time_minutes INTEGER

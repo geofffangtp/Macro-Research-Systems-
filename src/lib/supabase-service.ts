@@ -217,7 +217,18 @@ export async function loadDigests(): Promise<Digest[]> {
 }
 
 export async function saveDigest(digest: Digest): Promise<void> {
-  const dbDigest = toSnakeCase(digest as unknown as Record<string, unknown>);
+  // Only include fields that exist in the database schema
+  const dbDigest = {
+    id: digest.id,
+    date: digest.date,
+    type: digest.type,
+    sections: digest.sections,
+    raw_content: digest.rawContent,
+    market_activity: digest.marketActivity,
+    generated_at: digest.generatedAt,
+    reading_time_minutes: digest.readingTimeMinutes,
+  };
+
   const { error } = await supabase
     .from('digests')
     .upsert(dbDigest, { onConflict: 'id' });

@@ -185,7 +185,7 @@ export function DigestView() {
         .map((e) => ({
           topic: e.topic,
           conclusion: e.conclusion,
-          dateCreated: e.dateCreated,
+          dateCreated: e.dateCreated || e.createdAt, // Fallback to createdAt for Supabase entries
           thesisImpact: e.thesisImpact,
           status: e.status,
           catalystToWatch: e.catalystToWatch,
