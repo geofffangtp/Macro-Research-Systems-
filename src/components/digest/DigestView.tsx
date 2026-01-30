@@ -29,6 +29,7 @@ import {
   ChevronLeft,
 } from 'lucide-react';
 import { DigestContent } from './DigestContent';
+import { WeeklySynthesisContent } from './WeeklySynthesis';
 import { MarketTickerCompact } from '@/components/ui/MarketTicker';
 import { CatalystsCalendar } from '@/components/ui/CatalystsCalendar';
 
@@ -842,7 +843,7 @@ export function DigestView() {
             </div>
             <div className="flex-1 overflow-y-auto p-6">
               {weeklySynthesisContent ? (
-                <DigestContent content={weeklySynthesisContent} />
+                <WeeklySynthesisContent content={weeklySynthesisContent} />
               ) : (
                 <p className="text-sm text-slate-500">No synthesis content generated.</p>
               )}
