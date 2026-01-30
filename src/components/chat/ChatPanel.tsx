@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Send, Loader2, MessageSquare, Sparkles, Globe, ChevronDown, ChevronUp, X, BookmarkPlus, Save, Maximize2, Minimize2 } from 'lucide-react';
+import { Send, Loader2, MessageSquare, Sparkles, Globe, ChevronDown, ChevronUp, X, BookmarkPlus, Save, Maximize2, Minimize2, Plus } from 'lucide-react';
 import { useAppStore } from '@/store';
 import { SaveToKBModal } from './SaveToKBModal';
 import { SaveConversationModal } from './SaveConversationModal';
@@ -283,6 +283,17 @@ export function ChatPanel({ isExpanded = false, onToggleExpand }: ChatPanelProps
           </div>
         </div>
         <div className="flex items-center gap-1">
+          {/* New Chat Button */}
+          {messages.length >= 1 && (
+            <button
+              onClick={handleClearChat}
+              className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+              title="Start new chat (discard current)"
+            >
+              <Plus size={14} />
+              <span className="hidden sm:inline">New Chat</span>
+            </button>
+          )}
           {/* Save Conversation Button */}
           {messages.length >= 2 && (
             <button

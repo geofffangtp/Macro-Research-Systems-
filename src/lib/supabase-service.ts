@@ -148,17 +148,26 @@ export async function loadKnowledgeEntries(): Promise<KnowledgeEntry[]> {
     return [];
   }
 
-  return (data || []).map((item) => toCamelCase(item) as unknown as KnowledgeEntry);
+  return (data || []).map((item) => {
+    const entry = toCamelCase(item) as unknown as KnowledgeEntry;
+    // Set dateCreated from createdAt for app compatibility (dateCreated not in DB schema)
+    entry.dateCreated = entry.dateCreated || entry.createdAt;
+    return entry;
+  });
 }
 
 export async function saveKnowledgeEntry(entry: KnowledgeEntry): Promise<void> {
   const dbEntry = toSnakeCase(entry as unknown as Record<string, unknown>);
+  // Remove date_created as it doesn't exist in DB schema (app uses createdAt instead)
+  delete dbEntry.date_created;
+
   const { error } = await supabase
     .from('knowledge_entries')
     .upsert(dbEntry, { onConflict: 'id' });
 
   if (error) {
     console.error('Error saving knowledge entry:', error);
+    throw error; // Throw so caller knows save failed
   }
 }
 
