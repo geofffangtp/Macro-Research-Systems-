@@ -11,8 +11,9 @@ import {
   Globe,
   Plus,
   X,
-  AlertCircle,
+  Star,
 } from 'lucide-react';
+import { useAppStore } from '@/store';
 
 interface Catalyst {
   id: string;
@@ -24,97 +25,8 @@ interface Catalyst {
   description?: string;
   previousValue?: string;
   expectedValue?: string;
-}
-
-// Sample catalysts - in production, this would come from store/API
-const SAMPLE_CATALYSTS: Catalyst[] = [
-  {
-    id: '1',
-    title: 'FOMC Rate Decision',
-    date: getDateOffset(1),
-    time: '2:00 PM ET',
-    category: 'fed',
-    importance: 'high',
-    description: 'Federal Reserve interest rate decision and policy statement',
-    expectedValue: 'Hold at 4.25-4.50%',
-  },
-  {
-    id: '2',
-    title: 'Core PCE Price Index',
-    date: getDateOffset(2),
-    time: '8:30 AM ET',
-    category: 'economic',
-    importance: 'high',
-    description: "Fed's preferred inflation measure",
-    previousValue: '2.8%',
-    expectedValue: '2.7%',
-  },
-  {
-    id: '3',
-    title: 'AAPL Earnings',
-    date: getDateOffset(3),
-    time: 'After Close',
-    category: 'earnings',
-    importance: 'high',
-    description: 'Apple Q1 FY25 earnings report',
-    expectedValue: 'EPS $2.35',
-  },
-  {
-    id: '4',
-    title: 'Initial Jobless Claims',
-    date: getDateOffset(1),
-    time: '8:30 AM ET',
-    category: 'economic',
-    importance: 'medium',
-    previousValue: '223K',
-    expectedValue: '220K',
-  },
-  {
-    id: '5',
-    title: 'GDP Q4 (2nd Est)',
-    date: getDateOffset(4),
-    time: '8:30 AM ET',
-    category: 'economic',
-    importance: 'high',
-    description: 'Second estimate of Q4 GDP growth',
-    previousValue: '3.1%',
-    expectedValue: '3.2%',
-  },
-  {
-    id: '6',
-    title: 'MSFT Earnings',
-    date: getDateOffset(2),
-    time: 'After Close',
-    category: 'earnings',
-    importance: 'high',
-    description: 'Microsoft Q2 FY25 earnings report',
-  },
-  {
-    id: '7',
-    title: 'ISM Manufacturing PMI',
-    date: getDateOffset(5),
-    time: '10:00 AM ET',
-    category: 'economic',
-    importance: 'medium',
-    previousValue: '49.2',
-    expectedValue: '49.5',
-  },
-  {
-    id: '8',
-    title: 'Powell Press Conference',
-    date: getDateOffset(1),
-    time: '2:30 PM ET',
-    category: 'fed',
-    importance: 'high',
-    description: 'Fed Chair Powell post-FOMC press conference',
-  },
-];
-
-// Helper to get dates relative to today
-function getDateOffset(days: number): string {
-  const date = new Date();
-  date.setDate(date.getDate() + days);
-  return date.toISOString().split('T')[0];
+  isFlagged?: boolean;
+  sourceType?: 'data_release' | 'custom';
 }
 
 // Get the start of the week (Sunday)
@@ -189,9 +101,41 @@ const importanceColors = {
 };
 
 export function CatalystsCalendar() {
+  const { dataReleases } = useAppStore();
   const [weekOffset, setWeekOffset] = useState(0);
   const [selectedCatalyst, setSelectedCatalyst] = useState<Catalyst | null>(null);
-  const [catalysts] = useState<Catalyst[]>(SAMPLE_CATALYSTS);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [customCatalysts, setCustomCatalysts] = useState<Catalyst[]>([]);
+
+  // Convert data releases to catalysts
+  const catalysts = useMemo(() => {
+    const fromReleases: Catalyst[] = dataReleases
+      .filter((r) => r.nextReleaseDate) // Only those with upcoming dates
+      .map((release) => ({
+        id: `release-${release.id}`,
+        title: release.name,
+        date: release.nextReleaseDate!,
+        category: 'economic' as const,
+        importance: release.tier === 'tier1' ? 'high' : release.tier === 'tier2' ? 'medium' : 'low',
+        description: release.thesisConnection || release.description,
+        previousValue: release.lastValue,
+        sourceType: 'data_release' as const,
+      }));
+
+    return [...fromReleases, ...customCatalysts].sort(
+      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+    );
+  }, [dataReleases, customCatalysts]);
+
+  const addCustomCatalyst = (catalyst: Omit<Catalyst, 'id' | 'sourceType'>) => {
+    const newCatalyst: Catalyst = {
+      ...catalyst,
+      id: `custom-${Date.now()}`,
+      sourceType: 'custom',
+    };
+    setCustomCatalysts((prev) => [...prev, newCatalyst]);
+    setShowAddModal(false);
+  };
 
   // Calculate week dates
   const weekDates = useMemo(() => {
@@ -247,25 +191,34 @@ export function CatalystsCalendar() {
             <p className="text-xs text-slate-500">{weekLabel}</p>
           </div>
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-2">
           <button
-            onClick={() => setWeekOffset((w) => w - 1)}
-            className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
+            onClick={() => setShowAddModal(true)}
+            className="flex items-center gap-1 rounded-lg bg-indigo-50 px-2.5 py-1.5 text-xs font-medium text-indigo-600 hover:bg-indigo-100 dark:bg-indigo-500/10 dark:text-indigo-400 dark:hover:bg-indigo-500/20"
           >
-            <ChevronLeft size={18} />
+            <Plus size={14} />
+            Add
           </button>
-          <button
-            onClick={() => setWeekOffset(0)}
-            className="rounded-lg px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
-          >
-            Today
-          </button>
-          <button
-            onClick={() => setWeekOffset((w) => w + 1)}
-            className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
-          >
-            <ChevronRight size={18} />
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setWeekOffset((w) => w - 1)}
+              className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
+            >
+              <ChevronLeft size={18} />
+            </button>
+            <button
+              onClick={() => setWeekOffset(0)}
+              className="rounded-lg px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+            >
+              Today
+            </button>
+            <button
+              onClick={() => setWeekOffset((w) => w + 1)}
+              className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
+            >
+              <ChevronRight size={18} />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -464,6 +417,171 @@ export function CatalystsCalendar() {
           </div>
         </div>
       )}
+
+      {/* Add Catalyst Modal */}
+      {showAddModal && (
+        <AddCatalystModal
+          onAdd={addCustomCatalyst}
+          onClose={() => setShowAddModal(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+// Add Catalyst Modal Component
+function AddCatalystModal({
+  onAdd,
+  onClose,
+}: {
+  onAdd: (catalyst: Omit<Catalyst, 'id' | 'sourceType'>) => void;
+  onClose: () => void;
+}) {
+  const [title, setTitle] = useState('');
+  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [time, setTime] = useState('');
+  const [category, setCategory] = useState<Catalyst['category']>('earnings');
+  const [importance, setImportance] = useState<Catalyst['importance']>('high');
+  const [description, setDescription] = useState('');
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!title || !date) return;
+
+    onAdd({
+      title,
+      date,
+      time: time || undefined,
+      category,
+      importance,
+      description: description || undefined,
+    });
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        className="mx-4 w-full max-w-md rounded-2xl bg-white p-6 shadow-xl dark:bg-slate-900"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-bold text-slate-900 dark:text-white">Add Catalyst</h3>
+          <button
+            onClick={onClose}
+            className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+              Title *
+            </label>
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="e.g., MSFT Earnings, Fed Meeting"
+              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+              required
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+                Date *
+              </label>
+              <input
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+                Time
+              </label>
+              <input
+                type="text"
+                value={time}
+                onChange={(e) => setTime(e.target.value)}
+                placeholder="e.g., 2:00 PM ET"
+                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+                Category
+              </label>
+              <select
+                value={category}
+                onChange={(e) => setCategory(e.target.value as Catalyst['category'])}
+                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+              >
+                <option value="earnings">Earnings</option>
+                <option value="economic">Economic</option>
+                <option value="fed">Fed</option>
+                <option value="geopolitical">Geopolitical</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+                Importance
+              </label>
+              <select
+                value={importance}
+                onChange={(e) => setImportance(e.target.value as Catalyst['importance'])}
+                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+              >
+                <option value="high">High</option>
+                <option value="medium">Medium</option>
+                <option value="low">Low</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+              Why it matters (thesis connection)
+            </label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="e.g., Key indicator for AI capex narrative..."
+              rows={2}
+              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+            />
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-lg px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="rounded-lg bg-gradient-to-r from-indigo-600 to-violet-600 px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
+            >
+              Add Catalyst
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }

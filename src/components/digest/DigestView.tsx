@@ -7,9 +7,6 @@ import {
   ChevronDown,
   ChevronUp,
   MessageSquare,
-  Flag,
-  ThumbsUp,
-  ThumbsDown,
   TrendingUp,
   TrendingDown,
   Minus,
@@ -34,16 +31,6 @@ import {
 import { DigestContent } from './DigestContent';
 import { MarketTickerCompact } from '@/components/ui/MarketTicker';
 import { CatalystsCalendar } from '@/components/ui/CatalystsCalendar';
-
-// Helper to dispatch discuss event to the chat panel
-function dispatchDiscussEvent(item: { title: string; content: string; source?: string }) {
-  const event = new CustomEvent('discuss-item', {
-    detail: {
-      prompt: `Let's discuss: "${item.title}"\n\n${item.content.slice(0, 500)}${item.content.length > 500 ? '...' : ''}`,
-    },
-  });
-  window.dispatchEvent(event);
-}
 
 // Helper function to extract open threads from digest content
 function extractOpenThreads(content: string): string[] {
@@ -99,7 +86,6 @@ function extractSourceCitations(content: string): string[] {
 export function DigestView() {
   const {
     sources,
-    sourceItems,
     dataReleases,
     thesis,
     knowledgeEntries,
@@ -135,6 +121,9 @@ export function DigestView() {
   const [showAddThread, setShowAddThread] = useState(false);
   const [showDigestHistory, setShowDigestHistory] = useState(false);
   const [selectedHistoryDigest, setSelectedHistoryDigest] = useState<string | null>(null);
+  const [showWeeklySynthesis, setShowWeeklySynthesis] = useState(false);
+  const [weeklySynthesisContent, setWeeklySynthesisContent] = useState<string>('');
+  const [isGeneratingWeekly, setIsGeneratingWeekly] = useState(false);
 
   // Get open threads for display
   const recentOpenThreads = getRecentOpenThreads(7);
@@ -262,6 +251,55 @@ export function DigestView() {
     }
   };
 
+  const generateWeeklySynthesis = async () => {
+    setIsGeneratingWeekly(true);
+    try {
+      // Get digests from the past 7 days
+      const oneWeekAgo = new Date();
+      oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+
+      const weekDigests = digests
+        .filter((d) => new Date(d.date) >= oneWeekAgo)
+        .map((d) => ({
+          date: d.date,
+          content: d.rawContent || '',
+        }))
+        .filter((d) => d.content); // Only include digests with content
+
+      // Get KB entries from this week
+      const weekKBEntries = knowledgeEntries
+        .filter((e) => new Date(e.createdAt) >= oneWeekAgo)
+        .map((e) => ({
+          topic: e.topic,
+          conclusion: e.conclusion,
+          thesisImpact: e.thesisImpact,
+          createdAt: e.createdAt,
+        }));
+
+      const response = await fetch('/api/digest/weekly', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          digests: weekDigests,
+          knowledgeEntries: weekKBEntries,
+          thesis: thesis ? { name: thesis.name, summary: thesis.summary } : null,
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setWeeklySynthesisContent(data.synthesis);
+        setShowWeeklySynthesis(true);
+      } else {
+        console.error('Failed to generate weekly synthesis');
+      }
+    } catch (error) {
+      console.error('Error generating weekly synthesis:', error);
+    } finally {
+      setIsGeneratingWeekly(false);
+    }
+  };
+
   const today = new Date().toLocaleDateString('en-US', {
     weekday: 'long',
     year: 'numeric',
@@ -288,13 +326,23 @@ export function DigestView() {
           </div>
           <div className="flex items-center gap-2">
             {digests.length > 0 && (
-              <button
-                onClick={() => setShowDigestHistory(true)}
-                className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800"
-              >
-                <History size={14} />
-                History ({digests.length})
-              </button>
+              <>
+                <button
+                  onClick={() => setShowDigestHistory(true)}
+                  className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800"
+                >
+                  <History size={14} />
+                  History ({digests.length})
+                </button>
+                <button
+                  onClick={generateWeeklySynthesis}
+                  disabled={isGeneratingWeekly}
+                  className="flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-medium text-indigo-600 hover:bg-indigo-100 dark:border-indigo-800 dark:bg-indigo-500/10 dark:text-indigo-400 dark:hover:bg-indigo-500/20"
+                >
+                  <FileText size={14} className={isGeneratingWeekly ? 'animate-pulse' : ''} />
+                  {isGeneratingWeekly ? 'Generating...' : 'Weekly Review'}
+                </button>
+              </>
             )}
             <button
               onClick={generateDigest}
@@ -324,46 +372,6 @@ export function DigestView() {
       <div className="mb-6">
         <CatalystsCalendar />
       </div>
-
-      {/* Recent Items */}
-      <DigestSection
-        title="Recent Content"
-        description="Latest items from your sources"
-        icon={<MessageSquare size={16} />}
-        isExpanded={expandedSections.data}
-        onToggle={() => toggleSection('data')}
-        count={sourceItems.length}
-      >
-        {sourceItems.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12 text-center">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800">
-              <AlertCircle size={24} className="text-slate-400" />
-            </div>
-            <p className="mt-4 text-sm font-medium text-slate-600 dark:text-slate-400">
-              No content yet
-            </p>
-            <p className="mt-1 text-xs text-slate-400">
-              Add content using the button above or fetch from RSS feeds
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {sourceItems.slice(0, 10).map((item) => (
-              <SourceItemCard
-                key={item.id}
-                item={item}
-                onDiscuss={() =>
-                  dispatchDiscussEvent({
-                    title: item.title,
-                    content: item.content,
-                    source: item.author,
-                  })
-                }
-              />
-            ))}
-          </div>
-        )}
-      </DigestSection>
 
       {/* Data Releases */}
       <DigestSection
@@ -808,6 +816,40 @@ export function DigestView() {
           </div>
         </div>
       )}
+
+      {/* Weekly Synthesis Modal */}
+      {showWeeklySynthesis && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="flex h-[85vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-white shadow-xl dark:bg-slate-900 mx-4">
+            <div className="flex items-center justify-between border-b border-slate-200 p-4 dark:border-slate-700">
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-violet-500">
+                  <FileText size={18} className="text-white" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-slate-900 dark:text-white">Weekly Synthesis</h3>
+                  <p className="text-xs text-slate-500">
+                    {new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowWeeklySynthesis(false)}
+                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-6">
+              {weeklySynthesisContent ? (
+                <DigestContent content={weeklySynthesisContent} />
+              ) : (
+                <p className="text-sm text-slate-500">No synthesis content generated.</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -864,99 +906,6 @@ function DigestSection({
           {children}
         </div>
       )}
-    </div>
-  );
-}
-
-interface SourceItemCardProps {
-  item: {
-    id: string;
-    title: string;
-    content: string;
-    author?: string;
-    url?: string;
-    publishedAt: string;
-    isFlagged: boolean;
-    userRating?: 'up' | 'down';
-  };
-  onDiscuss: () => void;
-}
-
-function SourceItemCard({ item, onDiscuss }: SourceItemCardProps) {
-  const { rateSourceItem, flagSourceItem } = useAppStore();
-
-  return (
-    <div className="card-hover group rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-800/50">
-      <div className="mb-3 flex items-start justify-between">
-        <div className="flex-1">
-          <h4 className="font-semibold text-slate-900 dark:text-white leading-tight">
-            {item.title}
-          </h4>
-          {item.author && (
-            <p className="mt-1 text-xs font-medium text-indigo-600 dark:text-indigo-400">
-              @{item.author}
-            </p>
-          )}
-        </div>
-        <span className="ml-4 flex-shrink-0 rounded-full bg-slate-100 px-2 py-1 text-[10px] font-medium text-slate-500 dark:bg-slate-700 dark:text-slate-400">
-          {new Date(item.publishedAt).toLocaleDateString()}
-        </span>
-      </div>
-      <p className="mb-4 text-sm text-slate-600 dark:text-slate-400 line-clamp-3 leading-relaxed">
-        {item.content}
-      </p>
-      <div className="flex items-center gap-2">
-        <button
-          onClick={onDiscuss}
-          className="flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-indigo-500/10 to-violet-500/10 px-3 py-1.5 text-xs font-semibold text-indigo-700 transition-all hover:from-indigo-500/20 hover:to-violet-500/20 dark:text-indigo-400"
-        >
-          <MessageSquare size={12} />
-          Discuss
-        </button>
-        <button
-          onClick={() => flagSourceItem(item.id, !item.isFlagged)}
-          className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
-            item.isFlagged
-              ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400'
-              : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-400 dark:hover:bg-slate-600'
-          }`}
-        >
-          <Flag size={12} />
-          {item.isFlagged ? 'Flagged' : 'Flag'}
-        </button>
-        <div className="ml-auto flex items-center gap-1">
-          <button
-            onClick={() => rateSourceItem(item.id, 'up')}
-            className={`rounded-lg p-1.5 transition-all ${
-              item.userRating === 'up'
-                ? 'bg-indigo-100 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-400'
-                : 'text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'
-            }`}
-          >
-            <ThumbsUp size={14} />
-          </button>
-          <button
-            onClick={() => rateSourceItem(item.id, 'down')}
-            className={`rounded-lg p-1.5 transition-all ${
-              item.userRating === 'down'
-                ? 'bg-red-100 text-red-600 dark:bg-red-500/20 dark:text-red-400'
-                : 'text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'
-            }`}
-          >
-            <ThumbsDown size={14} />
-          </button>
-        </div>
-        {item.url && (
-          <a
-            href={item.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="rounded-lg p-1.5 text-slate-400 transition-all hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-700 dark:hover:text-slate-300"
-          >
-            <ExternalLink size={14} />
-          </a>
-        )}
-      </div>
     </div>
   );
 }
