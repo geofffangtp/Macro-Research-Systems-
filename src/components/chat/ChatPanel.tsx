@@ -80,6 +80,18 @@ export function ChatPanel({ isExpanded = false, onToggleExpand }: ChatPanelProps
     setActiveChatSession(newSession);
   };
 
+  // Discard chat entirely without saving
+  const handleDiscardChat = () => {
+    if (messages.length === 0) return;
+    if (window.confirm('Discard this conversation? It will not be saved.')) {
+      setMessages([]);
+      // Create a fresh session (the old one will be orphaned but that's fine)
+      const today = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      const newSession = createChatSession(`Research Session - ${today}`, 'general', currentDigest?.id);
+      setActiveChatSession(newSession);
+    }
+  };
+
   // Get or create today's chat session
   const getTodaySession = useCallback(() => {
     const today = new Date().toISOString().split('T')[0];
@@ -283,15 +295,15 @@ export function ChatPanel({ isExpanded = false, onToggleExpand }: ChatPanelProps
           </div>
         </div>
         <div className="flex items-center gap-1">
-          {/* New Chat Button */}
+          {/* Discard Chat Button */}
           {messages.length >= 1 && (
             <button
-              onClick={handleClearChat}
-              className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
-              title="Start new chat (discard current)"
+              onClick={handleDiscardChat}
+              className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
+              title="Discard conversation without saving"
             >
-              <Plus size={14} />
-              <span className="hidden sm:inline">New Chat</span>
+              <X size={14} />
+              <span className="hidden sm:inline">Discard</span>
             </button>
           )}
           {/* Save Conversation Button */}

@@ -196,7 +196,7 @@ function KnowledgeEntryCard({ entry, onDelete }: KnowledgeEntryCardProps) {
           <div>
             <h3 className="font-semibold text-zinc-900 dark:text-white">{entry.topic}</h3>
             <p className="text-xs text-zinc-500">
-              {new Date(entry.dateCreated || entry.createdAt).toLocaleDateString()}
+              {new Date(entry.dateCreated).toLocaleDateString()}
             </p>
           </div>
           <span

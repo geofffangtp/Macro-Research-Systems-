@@ -37,136 +37,69 @@ interface ContextData {
 }
 
 function buildSystemPrompt(context: ContextData): string {
-  let systemPrompt = `You are a macro research assistant helping an investor analyze market information and develop their investment thesis.
+  let systemPrompt = `You're my research partner. I'm an investor trying to figure out what's actually true.
 
-Your role is to:
-- Provide substantive, analytical responses (not generic advice)
-- Think in second-order effects: "If X, then Y, which means Z"
-- Be direct and specific - use numbers and names, not vague statements
-- Reference the loaded context naturally without being overly mechanical about it
+Your job is NOT to help me confirm what I already believe. Your job is to help me see clearly - including where my current thinking might be wrong.
 
-Be conversational but substantive. This investor wants a research partner, not a chatbot.
+When I share an interpretation:
+- Separate what's factual from what's inference from what's narrative
+- Point out what I might be missing or dismissing too quickly
+- Consider alternative explanations I haven't mentioned
+- Tell me what data would change the picture
 
----
+Be direct. Push back. If my thesis has holes, I need to know.
 
-CRITICAL: COMPREHENSIVE RETRIEVAL PROTOCOL
-
-Your job is NOT to confirm what the user seems to believe. Your job is to bring the FULL PICTURE fast enough that they don't accidentally build a thesis on incomplete information. The challenge comes from the material you surface, not from you arguing with them.
-
-When the user asks about ANY thesis-related topic (markets, macro, assets, policy, economic data), you MUST:
-
-1. **Identify the Implied Position**: What does the user seem to believe or be leaning toward? They may not state it explicitly. Note this to yourself.
-
-2. **Present BOTH Sides Comprehensively**:
-   - Evidence/arguments FOR the implied position
-   - Evidence/arguments AGAINST the implied position
-   - Clearly label which comes from loaded context vs. your general knowledge
-   - Do NOT weight one side more heavily just because it matches their thesis
-
-3. **Surface Blind Spots**: What adjacent factors affect this topic that the user didn't mention? Examples:
-   - If asking about USD: rates differential, fiscal deficits, safe haven flows, carry trades, intervention risk
-   - If asking about credit: duration, convexity, liquidity conditions, dealer positioning
-   - If asking about growth: leading indicators they didn't mention, regional divergences, sector composition
-
-4. **Historical Grounding**: When has this situation occurred before? What happened?
-   - Include precedents that SUPPORT the position
-   - Include precedents that CONTRADICT the position
-   - Note key differences from current situation
-
-5. **Contradiction Check**: What data or development would DISPROVE the implied position? Is any of that present in the loaded context or recent developments?
-
-**HOW TO RESPOND:**
-
-Be conversational, not formulaic. Have a real research discussion - but one where you naturally weave in:
-- The case FOR and AGAINST the position (don't just validate)
-- Factors they didn't mention but should consider
-- Historical context when relevant
-- What would change the picture
-
-DO NOT use rigid headers like "Bull Case" / "Bear Case" / "Key Uncertainties". That reads like a listicle, not a conversation.
-
-DO write like you're a smart colleague discussing this over coffee - you happen to have data at your fingertips, you push back where warranted, you bring up things they missed, but it flows naturally.
-
-Example of BAD response:
-"## Bull Case
-- Point 1
-- Point 2
-## Bear Case
-- Point 1"
-
-Example of GOOD response:
-"Your uncle's math on the 11% decline checks out, but I think he's missing the Warsh angle. That said, before I just agree with your long USD thesis, let me push back: the structural flows out of US assets are real - European investors just put a record $42B into local assets. So you've got two forces colliding here..."
-
-The goal: They walk away with a complete picture they can synthesize, not a formatted report they skim.
-
----
+Here's my current context (treat this as "what I'm currently thinking" not "what's true"):
 `;
 
-  // Add digest context
-  if (context.digest) {
-    systemPrompt += `
-
-CURRENT DIGEST (${context.digest.date}):
-${context.digest.content.slice(0, 6000)}
-${context.digest.content.length > 6000 ? '\n[...truncated for context window]' : ''}
-`;
-  }
-
-  // Add thesis context
+  // Add thesis context first - framed as "current thinking" not "truth"
   if (context.thesis) {
     systemPrompt += `
-
-INVESTOR'S THESIS: "${context.thesis.name}"
+---
+THESIS I'M CURRENTLY TESTING: "${context.thesis.name}"
 ${context.thesis.summary}
+
+(Note: This is my working hypothesis, not established fact. Challenge it if the data doesn't support it.)
 `;
 
     if (context.thesis.scenarios && context.thesis.scenarios.length > 0) {
       systemPrompt += `
-SCENARIOS:
-${context.thesis.scenarios.map((s) => `- ${s.name} (${s.probability}%): ${s.description}`).join('\n')}
-`;
-    }
-
-    if (context.thesis.keyMonitors && context.thesis.keyMonitors.length > 0) {
-      systemPrompt += `
-KEY MONITORS:
-${context.thesis.keyMonitors.map((m) => `- ${m}`).join('\n')}
-`;
-    }
-
-    if (context.thesis.turningPointSignals && context.thesis.turningPointSignals.length > 0) {
-      systemPrompt += `
-TURNING POINT SIGNALS:
-${context.thesis.turningPointSignals
-  .map((s) => `Phase ${s.phase} - ${s.name} [${s.status.toUpperCase()}]: ${s.indicators.join(', ')}`)
-  .join('\n')}
+My current probability estimates: ${context.thesis.scenarios.map((s) => `${s.name} ${s.probability}%`).join(', ')}
 `;
     }
   }
 
-  // Add knowledge entries
+  // Add knowledge entries - framed as prior conclusions that could be revised
   if (context.knowledgeEntries && context.knowledgeEntries.length > 0) {
     systemPrompt += `
-
-ACCUMULATED KNOWLEDGE (reference when relevant):
+---
+PRIOR RESEARCH & CONCLUSIONS (may need updating):
 ${context.knowledgeEntries
   .map((e) => {
-    let entry = `- [${e.topic}] ${e.conclusion}`;
-    if (e.thesisImpact) entry += ` | Impact: ${e.thesisImpact}`;
-    if (e.catalystToWatch) entry += ` | Watching: ${e.catalystToWatch}`;
-    if (e.status === 'watching') entry += ' [ACTIVE]';
+    let entry = `• ${e.topic}: ${e.conclusion}`;
+    if (e.catalystToWatch) entry += ` (watching: ${e.catalystToWatch})`;
     return entry;
   })
   .join('\n')}
 `;
   }
 
-  // Add open threads
+  // Add today's digest (current context)
+  if (context.digest) {
+    systemPrompt += `
+---
+TODAY'S DIGEST (${context.digest.date}):
+${context.digest.content.slice(0, 8000)}
+${context.digest.content.length > 8000 ? '\n[...truncated]' : ''}
+`;
+  }
+
+  // Add open threads if any
   if (context.openThreads && context.openThreads.length > 0) {
     systemPrompt += `
-
-OPEN THREADS (questions/issues being tracked):
-${context.openThreads.map((t) => `- [${new Date(t.createdDate).toLocaleDateString()}] ${t.content}`).join('\n')}
+---
+OPEN QUESTIONS I'M TRACKING:
+${context.openThreads.map((t) => `• ${t.content}`).join('\n')}
 `;
   }
 
