@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Send, Loader2, MessageSquare, Sparkles, Globe, ChevronDown, ChevronUp, X, BookmarkPlus, Save, Maximize2, Minimize2, Plus } from 'lucide-react';
+import { Send, Loader2, MessageSquare, Sparkles, Globe, ChevronDown, ChevronUp, X, BookmarkPlus, Save, Maximize2, Minimize2, Plus, BookOpen, Zap } from 'lucide-react';
 import { useAppStore } from '@/store';
 import { SaveToKBModal } from './SaveToKBModal';
 import { SaveConversationModal } from './SaveConversationModal';
@@ -11,12 +11,20 @@ interface Message {
   content: string;
 }
 
-// Quick action prompts
-const QUICK_ACTIONS = [
-  { label: "Today's key takeaways", prompt: "Summarize today's key takeaways and what's most important for my thesis." },
-  { label: "What challenges my thesis?", prompt: "What from today's digest challenges or contradicts my current thesis? Be direct." },
-  { label: "What should I watch?", prompt: "What are the key things I should be watching this week based on today's information?" },
-  { label: "Second-order effects", prompt: "What are the second-order effects of today's main stories that I might be missing?" },
+// Clean mode quick actions - general research questions
+const CLEAN_QUICK_ACTIONS = [
+  { label: "Explain a concept", prompt: "Explain " },
+  { label: "Analyze a view", prompt: "Here's a view I'm considering: " },
+  { label: "What am I missing?", prompt: "I'm thinking about [topic]. What might I be missing?" },
+  { label: "Compare perspectives", prompt: "What are the bull and bear cases for " },
+];
+
+// Context mode quick actions - thesis-specific
+const CONTEXT_QUICK_ACTIONS = [
+  { label: "How does this affect my thesis?", prompt: "How does today's news affect my thesis? Be specific about what confirms or challenges it." },
+  { label: "What challenges my view?", prompt: "What from today's digest challenges or contradicts my current thesis? Be direct." },
+  { label: "Update my scenarios", prompt: "Based on recent information, should I update my scenario probabilities? Walk me through it." },
+  { label: "Key monitors update", prompt: "How are my key monitors trending? What should I add or remove?" },
 ];
 
 interface ChatPanelProps {
@@ -43,6 +51,8 @@ export function ChatPanel({ isExpanded = false, onToggleExpand }: ChatPanelProps
   const [isMinimized, setIsMinimized] = useState(false);
   const [showContext, setShowContext] = useState(false);
   const [hoveredMessageIndex, setHoveredMessageIndex] = useState<number | null>(null);
+  // Context mode toggle - default OFF (clean mode) so Claude isn't biased by thesis/KB
+  const [contextMode, setContextMode] = useState(false);
   const [saveModalOpen, setSaveModalOpen] = useState(false);
   const [saveConversationModalOpen, setSaveConversationModalOpen] = useState(false);
   const [messageToSave, setMessageToSave] = useState<{ assistant: string; user: string } | null>(null);
@@ -204,17 +214,23 @@ export function ChatPanel({ isExpanded = false, onToggleExpand }: ChatPanelProps
     }
 
     try {
-      const context = buildContext();
+      // Only build and send context if context mode is enabled
+      const requestBody: Record<string, unknown> = {
+        message: userMessage,
+        previousMessages: messages.slice(-10), // Last 10 messages for context
+        enableWebSearch: true,
+        useContext: contextMode, // Tell API which mode we're in
+      };
+
+      // Only include context data if context mode is on
+      if (contextMode) {
+        requestBody.context = buildContext();
+      }
 
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: userMessage,
-          previousMessages: messages.slice(-10), // Last 10 messages for context
-          context,
-          enableWebSearch: true,
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       if (response.ok) {
@@ -286,15 +302,34 @@ export function ChatPanel({ isExpanded = false, onToggleExpand }: ChatPanelProps
       {/* Header */}
       <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3 dark:border-slate-800">
         <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-violet-500">
-            <Sparkles size={16} className="text-white" />
+          <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${
+            contextMode
+              ? 'bg-gradient-to-br from-amber-500 to-orange-500'
+              : 'bg-gradient-to-br from-indigo-500 to-violet-500'
+          }`}>
+            {contextMode ? <BookOpen size={16} className="text-white" /> : <Sparkles size={16} className="text-white" />}
           </div>
           <div>
             <h3 className="font-semibold text-slate-900 dark:text-white">Research Assistant</h3>
-            <p className="text-xs text-slate-500">Full context loaded</p>
+            <p className="text-xs text-slate-500">
+              {contextMode ? 'Thesis context loaded' : 'Clean mode - unbiased'}
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-1">
+          {/* Context Mode Toggle */}
+          <button
+            onClick={() => setContextMode(!contextMode)}
+            className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
+              contextMode
+                ? 'bg-amber-100 text-amber-700 hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-400'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400'
+            }`}
+            title={contextMode ? 'Turn off thesis context' : 'Turn on thesis context'}
+          >
+            {contextMode ? <BookOpen size={14} /> : <Zap size={14} />}
+            <span className="hidden sm:inline">{contextMode ? 'Context On' : 'Clean Mode'}</span>
+          </button>
           {/* Discard Chat Button */}
           {messages.length >= 1 && (
             <button
@@ -345,25 +380,39 @@ export function ChatPanel({ isExpanded = false, onToggleExpand }: ChatPanelProps
 
       {/* Context indicator (collapsible) */}
       {showContext && (
-        <div className="border-b border-slate-200 bg-slate-50 px-4 py-2 dark:border-slate-800 dark:bg-slate-800/50">
-          <p className="text-xs font-medium text-slate-500 mb-1">Loaded Context:</p>
+        <div className={`border-b px-4 py-2 ${
+          contextMode
+            ? 'border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20'
+            : 'border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-800/50'
+        }`}>
+          <p className="text-xs font-medium text-slate-500 mb-1">
+            {contextMode ? 'Context being sent to Claude:' : 'Clean mode - no thesis context sent'}
+          </p>
           <div className="flex flex-wrap gap-1">
-            {currentDigest && (
+            {contextMode ? (
+              <>
+                {currentDigest && (
+                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                    Today's Digest
+                  </span>
+                )}
+                {thesis && (
+                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                    Thesis: {thesis.name}
+                  </span>
+                )}
+                {knowledgeEntries.length > 0 && (
+                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                    {knowledgeEntries.length} KB Entries
+                  </span>
+                )}
+              </>
+            ) : (
               <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-medium text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400">
-                Today's Digest
+                No bias from thesis or prior research
               </span>
             )}
-            {thesis && (
-              <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-medium text-violet-700 dark:bg-violet-900/30 dark:text-violet-400">
-                Thesis: {thesis.name}
-              </span>
-            )}
-            {knowledgeEntries.length > 0 && (
-              <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-medium text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
-                {knowledgeEntries.length} Knowledge Entries
-              </span>
-            )}
-            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600 dark:bg-slate-700 dark:text-slate-400">
               <Globe size={10} className="inline mr-0.5" />
               Web Search
             </span>
@@ -376,29 +425,68 @@ export function ChatPanel({ isExpanded = false, onToggleExpand }: ChatPanelProps
         {messages.length === 0 && (
           <div className="py-8">
             <div className="text-center mb-6">
-              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500/10 to-violet-500/10">
-                <MessageSquare size={24} className="text-indigo-600 dark:text-indigo-400" />
+              <div className={`mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl ${
+                contextMode
+                  ? 'bg-gradient-to-br from-amber-500/10 to-orange-500/10'
+                  : 'bg-gradient-to-br from-indigo-500/10 to-violet-500/10'
+              }`}>
+                {contextMode
+                  ? <BookOpen size={24} className="text-amber-600 dark:text-amber-400" />
+                  : <MessageSquare size={24} className="text-indigo-600 dark:text-indigo-400" />
+                }
               </div>
-              <h4 className="font-semibold text-slate-900 dark:text-white">Your Research Partner</h4>
+              <h4 className="font-semibold text-slate-900 dark:text-white">
+                {contextMode ? 'Thesis Analysis Mode' : 'Your Research Partner'}
+              </h4>
               <p className="mt-1 text-sm text-slate-500">
-                I have context on today's digest, your thesis, and accumulated knowledge.
+                {contextMode
+                  ? 'I have your thesis, knowledge base, and digest loaded. Ask me how new info affects your views.'
+                  : 'Ask anything. I\'ll explain clearly without assumptions or narrative bias.'
+                }
               </p>
             </div>
 
-            {/* Quick actions */}
+            {/* Quick actions - different based on mode */}
             <div className="space-y-2">
-              <p className="text-xs font-medium text-slate-500 text-center">Quick prompts:</p>
+              <p className="text-xs font-medium text-slate-500 text-center">
+                {contextMode ? 'Thesis prompts:' : 'Get started:'}
+              </p>
               <div className={`grid gap-2 ${isExpanded ? 'grid-cols-4' : 'grid-cols-2'}`}>
-                {QUICK_ACTIONS.map((action, i) => (
+                {(contextMode ? CONTEXT_QUICK_ACTIONS : CLEAN_QUICK_ACTIONS).map((action, i) => (
                   <button
                     key={i}
-                    onClick={() => sendMessage(action.prompt)}
-                    className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-left text-xs text-slate-700 hover:border-indigo-300 hover:bg-indigo-50 transition-colors dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:border-indigo-700 dark:hover:bg-indigo-900/20"
+                    onClick={() => {
+                      // For prompts that end with space, put in input instead of sending
+                      if (action.prompt.endsWith(' ')) {
+                        setInput(action.prompt);
+                        inputRef.current?.focus();
+                      } else {
+                        sendMessage(action.prompt);
+                      }
+                    }}
+                    className={`rounded-xl border px-3 py-2 text-left text-xs transition-colors ${
+                      contextMode
+                        ? 'border-amber-200 bg-amber-50 text-amber-700 hover:border-amber-300 hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-400 dark:hover:border-amber-700'
+                        : 'border-slate-200 bg-slate-50 text-slate-700 hover:border-indigo-300 hover:bg-indigo-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:border-indigo-700 dark:hover:bg-indigo-900/20'
+                    }`}
                   >
                     {action.label}
                   </button>
                 ))}
               </div>
+            </div>
+
+            {/* Mode hint */}
+            <div className="mt-4 text-center">
+              <button
+                onClick={() => setContextMode(!contextMode)}
+                className="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+              >
+                {contextMode
+                  ? '→ Switch to clean mode for unbiased answers'
+                  : '→ Switch to context mode to analyze against your thesis'
+                }
+              </button>
             </div>
           </div>
         )}
@@ -457,9 +545,16 @@ export function ChatPanel({ isExpanded = false, onToggleExpand }: ChatPanelProps
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Ask about the digest, thesis, or market developments..."
+            placeholder={contextMode
+              ? "How does [news] affect my thesis?"
+              : "Ask me anything..."
+            }
             rows={isExpanded ? 2 : 1}
-            className="flex-1 resize-none rounded-xl border border-slate-300 px-4 py-2.5 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+            className={`flex-1 resize-none rounded-xl border px-4 py-2.5 text-sm focus:outline-none focus:ring-1 dark:bg-slate-800 dark:text-white ${
+              contextMode
+                ? 'border-amber-300 focus:border-amber-500 focus:ring-amber-500 dark:border-amber-700'
+                : 'border-slate-300 focus:border-indigo-500 focus:ring-indigo-500 dark:border-slate-700'
+            }`}
           />
           <button
             onClick={() => sendMessage()}

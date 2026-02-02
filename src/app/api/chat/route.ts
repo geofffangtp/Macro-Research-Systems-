@@ -36,70 +36,78 @@ interface ContextData {
   }>;
 }
 
-function buildSystemPrompt(context: ContextData): string {
-  let systemPrompt = `You're my research partner. I'm an investor trying to figure out what's actually true.
+// Clean mode - no context loaded, pure conversation
+function buildCleanSystemPrompt(): string {
+  return `You are a senior macro research analyst. Your job is to help me understand markets, economics, and investment concepts.
 
-Your job is NOT to help me confirm what I already believe. Your job is to help me see clearly - including where my current thinking might be wrong.
+How to respond:
 
-When I share an interpretation:
-- Separate what's factual from what's inference from what's narrative
-- Point out what I might be missing or dismissing too quickly
-- Consider alternative explanations I haven't mentioned
-- Tell me what data would change the picture
+**When I ask you to explain something:**
+- Explain it clearly and directly
+- Use concrete examples and specific numbers
+- Don't assume I have prior context - teach me from scratch
+- Keep it factual, not narrative-driven
 
-Be direct. Push back. If my thesis has holes, I need to know.
+**When I share a view or thesis:**
+- Analyze it objectively
+- Present evidence for AND against
+- Point out what I might be missing
+- Don't just validate - genuinely challenge if warranted
 
-Here's my current context (treat this as "what I'm currently thinking" not "what's true"):
+**When I'm confused:**
+- Break it down simply
+- Use analogies if helpful
+- Don't pile on complexity
+
+**General principles:**
+- Be direct and specific
+- Separate facts from interpretation from speculation
+- If data is mixed or unclear, say so - don't force a clean narrative
+- Think like an analyst, not an advocate
+
+I want a research partner who helps me see clearly, not one who confirms what I already believe.`;
+}
+
+// Context mode - load thesis and research context
+function buildContextSystemPrompt(context: ContextData): string {
+  let systemPrompt = `You are a senior macro research analyst helping me analyze how new information affects my investment thesis.
+
+I'm sharing my current thesis and research context below. Help me:
+- See how new data supports or challenges my thesis
+- Identify what I might be missing
+- Think through implications
+- Update my views if warranted
+
+Be direct. If my thesis has holes, tell me. If the data doesn't support my view, say so clearly.
+
+---
+MY CURRENT THESIS AND CONTEXT:
 `;
 
-  // Add thesis context first - framed as "current thinking" not "truth"
   if (context.thesis) {
     systemPrompt += `
----
-THESIS I'M CURRENTLY TESTING: "${context.thesis.name}"
+**THESIS: "${context.thesis.name}"**
 ${context.thesis.summary}
-
-(Note: This is my working hypothesis, not established fact. Challenge it if the data doesn't support it.)
 `;
-
     if (context.thesis.scenarios && context.thesis.scenarios.length > 0) {
       systemPrompt += `
-My current probability estimates: ${context.thesis.scenarios.map((s) => `${s.name} ${s.probability}%`).join(', ')}
+Scenario probabilities: ${context.thesis.scenarios.map((s) => `${s.name} ${s.probability}%`).join(', ')}
 `;
     }
   }
 
-  // Add knowledge entries - framed as prior conclusions that could be revised
   if (context.knowledgeEntries && context.knowledgeEntries.length > 0) {
     systemPrompt += `
----
-PRIOR RESEARCH & CONCLUSIONS (may need updating):
-${context.knowledgeEntries
-  .map((e) => {
-    let entry = `• ${e.topic}: ${e.conclusion}`;
-    if (e.catalystToWatch) entry += ` (watching: ${e.catalystToWatch})`;
-    return entry;
-  })
-  .join('\n')}
+**PRIOR RESEARCH:**
+${context.knowledgeEntries.map((e) => `• ${e.topic}: ${e.conclusion}`).join('\n')}
 `;
   }
 
-  // Add today's digest (current context)
   if (context.digest) {
     systemPrompt += `
----
-TODAY'S DIGEST (${context.digest.date}):
-${context.digest.content.slice(0, 8000)}
-${context.digest.content.length > 8000 ? '\n[...truncated]' : ''}
-`;
-  }
-
-  // Add open threads if any
-  if (context.openThreads && context.openThreads.length > 0) {
-    systemPrompt += `
----
-OPEN QUESTIONS I'M TRACKING:
-${context.openThreads.map((t) => `• ${t.content}`).join('\n')}
+**TODAY'S DIGEST (${context.digest.date}):**
+${context.digest.content.slice(0, 6000)}
+${context.digest.content.length > 6000 ? '\n[...truncated]' : ''}
 `;
   }
 
@@ -108,13 +116,12 @@ ${context.openThreads.map((t) => `• ${t.content}`).join('\n')}
 
 export async function POST(request: NextRequest) {
   try {
-    // Validate request body
     const validation = await validateRequest(request, chatRequestSchema);
     if (!validation.success) {
       return NextResponse.json({ error: validation.error }, { status: 400 });
     }
 
-    const { item, message, previousMessages, thesis, context, enableWebSearch } = validation.data;
+    const { item, message, previousMessages, thesis, context, enableWebSearch, useContext } = validation.data;
 
     if (!process.env.ANTHROPIC_API_KEY) {
       return NextResponse.json(
@@ -123,30 +130,39 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Build context from new format or legacy format
-    let fullContext: ContextData = {};
+    // Determine which system prompt to use based on useContext flag
+    let systemPrompt: string;
 
-    if (context) {
-      fullContext = context;
-    } else if (item) {
-      // Legacy: single item context
-      fullContext = {
-        digest: {
-          date: new Date().toISOString(),
-          content: `Discussing: ${item.title}\n\n${item.content}${item.source ? `\n\nSource: @${item.source}` : ''}`,
-        },
-      };
-      if (thesis) {
-        fullContext.thesis = {
-          name: thesis.name || 'Investment Thesis',
-          summary: thesis.summary,
+    if (useContext === false) {
+      // Explicit clean mode - no context
+      systemPrompt = buildCleanSystemPrompt();
+    } else if (context || item || thesis) {
+      // Context provided - use context mode
+      let fullContext: ContextData = {};
+
+      if (context) {
+        fullContext = context;
+      } else if (item) {
+        fullContext = {
+          digest: {
+            date: new Date().toISOString(),
+            content: `Discussing: ${item.title}\n\n${item.content}${item.source ? `\n\nSource: @${item.source}` : ''}`,
+          },
         };
+        if (thesis) {
+          fullContext.thesis = {
+            name: thesis.name || 'Investment Thesis',
+            summary: thesis.summary,
+          };
+        }
       }
+
+      systemPrompt = buildContextSystemPrompt(fullContext);
+    } else {
+      // No context provided - default to clean mode
+      systemPrompt = buildCleanSystemPrompt();
     }
 
-    const systemPrompt = buildSystemPrompt(fullContext);
-
-    // Build messages array
     const messages: Array<{ role: 'user' | 'assistant'; content: string }> = [];
 
     if (previousMessages && previousMessages.length > 0) {
@@ -155,7 +171,6 @@ export async function POST(request: NextRequest) {
 
     messages.push({ role: 'user', content: message });
 
-    // Call Claude API with optional web search
     const apiParams: Anthropic.MessageCreateParams = {
       model: 'claude-sonnet-4-20250514',
       max_tokens: 4000,
@@ -163,20 +178,18 @@ export async function POST(request: NextRequest) {
       messages,
     };
 
-    // Enable web search if requested
     if (enableWebSearch) {
       apiParams.tools = [
         {
           type: 'web_search_20250305',
           name: 'web_search',
-          max_uses: 3,
+          max_uses: 5,
         } as Anthropic.WebSearchTool20250305,
       ];
     }
 
     const response = await anthropic.messages.create(apiParams);
 
-    // Extract text response, handling web search results if present
     let responseText = '';
     for (const block of response.content) {
       if (block.type === 'text') {

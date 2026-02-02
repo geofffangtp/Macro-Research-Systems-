@@ -94,6 +94,8 @@ export const chatRequestSchema = z.object({
   }).optional(),
   // Enable web search
   enableWebSearch: z.boolean().optional(),
+  // Control context loading: true = load thesis/KB/digest, false = clean mode
+  useContext: z.boolean().optional(),
 });
 
 // Digest generation schema
