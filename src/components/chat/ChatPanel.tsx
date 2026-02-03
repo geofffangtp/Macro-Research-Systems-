@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Send, Loader2, MessageSquare, Sparkles, Globe, ChevronDown, ChevronUp, X, BookmarkPlus, Save, Maximize2, Minimize2, BookOpen, Zap, Settings, Swords, FileText, ListTree, ToggleLeft, ToggleRight, Copy, Check, TrendingUp, Download, RefreshCw, Sparkle } from 'lucide-react';
+import { Send, Loader2, MessageSquare, Sparkles, Globe, ChevronDown, ChevronUp, X, BookmarkPlus, Save, Maximize2, Minimize2, BookOpen, Zap, Settings, Swords, FileText, ListTree, ToggleLeft, ToggleRight, Copy, Check, TrendingUp, Download, RefreshCw, Sparkle, History } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { useAppStore } from '@/store';
 import { SaveToKBModal } from './SaveToKBModal';
@@ -113,6 +113,8 @@ export function ChatPanel({ isExpanded = false, onToggleExpand }: ChatPanelProps
   // Show slash command suggestions
   const [showSlashCommands, setShowSlashCommands] = useState(false);
   const [slashFilter, setSlashFilter] = useState('');
+  // Show history panel
+  const [showHistory, setShowHistory] = useState(false);
   const [saveModalOpen, setSaveModalOpen] = useState(false);
   const [saveConversationModalOpen, setSaveConversationModalOpen] = useState(false);
   const [messageToSave, setMessageToSave] = useState<{ assistant: string; user: string } | null>(null);
@@ -548,6 +550,20 @@ export function ChatPanel({ isExpanded = false, onToggleExpand }: ChatPanelProps
           >
             <Settings size={16} />
           </button>
+          {/* History */}
+          {chatSessions.length > 1 && (
+            <button
+              onClick={() => setShowHistory(!showHistory)}
+              className={`rounded-lg p-1.5 transition-colors ${
+                showHistory
+                  ? 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400'
+                  : 'text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800'
+              }`}
+              title="Conversation history"
+            >
+              <History size={14} />
+            </button>
+          )}
           {/* Export to Markdown */}
           {messages.length >= 2 && (
             <button
@@ -694,6 +710,34 @@ export function ChatPanel({ isExpanded = false, onToggleExpand }: ChatPanelProps
                 {devilsAdvocate ? <ToggleRight size={16} /> : <ToggleLeft size={16} />}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* History Panel */}
+      {showHistory && (
+        <div className="border-b border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-800/50 max-h-48 overflow-y-auto">
+          <p className="text-[10px] font-medium uppercase tracking-wide text-slate-500 mb-2">Recent Conversations</p>
+          <div className="space-y-1">
+            {chatSessions.slice(0, 10).map((session) => (
+              <button
+                key={session.id}
+                onClick={() => {
+                  setActiveChatSession(session);
+                  setShowHistory(false);
+                }}
+                className={`w-full text-left rounded-lg px-3 py-2 text-xs transition-colors ${
+                  activeChatSession?.id === session.id
+                    ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400'
+                    : 'hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-400'
+                }`}
+              >
+                <div className="font-medium truncate">{session.title}</div>
+                <div className="text-[10px] text-slate-400 mt-0.5">
+                  {new Date(session.createdAt).toLocaleDateString()} • {session.messages.length} messages
+                </div>
+              </button>
+            ))}
           </div>
         </div>
       )}
