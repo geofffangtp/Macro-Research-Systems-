@@ -40,6 +40,18 @@ const MACRO_TOPICS = [
   "Yield curve",
 ];
 
+// Slash commands for quick actions
+const SLASH_COMMANDS = [
+  { command: '/stock', description: 'Stock analysis', prompt: 'Give me a comprehensive investment analysis of ' },
+  { command: '/industry', description: 'Industry for PE/VC', prompt: 'Analyze the [INDUSTRY] space for a growth equity investor. Cover: TAM, key players, what makes winners, deal multiples, and risks.' },
+  { command: '/data', description: 'Data release reaction', prompt: 'The latest [DATA] came in at [X] vs [Y] expected. What does this mean?' },
+  { command: '/bull', description: 'Bull case', prompt: 'Give me the strongest bull case for ' },
+  { command: '/bear', description: 'Bear case', prompt: 'Give me the strongest bear case for ' },
+  { command: '/compare', description: 'Compare two things', prompt: 'Compare and contrast ' },
+  { command: '/explain', description: 'Explain concept', prompt: 'Explain ' },
+  { command: '/thesis', description: 'Analyze vs thesis', prompt: 'How does this affect my thesis: ' },
+];
+
 // Analysis templates for common workflows
 const ANALYSIS_TEMPLATES = [
   {
@@ -98,6 +110,9 @@ export function ChatPanel({ isExpanded = false, onToggleExpand }: ChatPanelProps
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   // Show thesis summary panel
   const [showThesisSummary, setShowThesisSummary] = useState(false);
+  // Show slash command suggestions
+  const [showSlashCommands, setShowSlashCommands] = useState(false);
+  const [slashFilter, setSlashFilter] = useState('');
   const [saveModalOpen, setSaveModalOpen] = useState(false);
   const [saveConversationModalOpen, setSaveConversationModalOpen] = useState(false);
   const [messageToSave, setMessageToSave] = useState<{ assistant: string; user: string } | null>(null);
@@ -388,8 +403,40 @@ export function ChatPanel({ isExpanded = false, onToggleExpand }: ChatPanelProps
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
+      if (showSlashCommands) {
+        // Select first matching command
+        const filtered = SLASH_COMMANDS.filter((c) =>
+          c.command.toLowerCase().includes(slashFilter.toLowerCase())
+        );
+        if (filtered.length > 0) {
+          handleSlashCommand(filtered[0]);
+          return;
+        }
+      }
       sendMessage();
     }
+    if (e.key === 'Escape' && showSlashCommands) {
+      setShowSlashCommands(false);
+    }
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const value = e.target.value;
+    setInput(value);
+
+    // Check for slash command
+    if (value.startsWith('/')) {
+      setShowSlashCommands(true);
+      setSlashFilter(value.slice(1));
+    } else {
+      setShowSlashCommands(false);
+    }
+  };
+
+  const handleSlashCommand = (cmd: typeof SLASH_COMMANDS[0]) => {
+    setInput(cmd.prompt);
+    setShowSlashCommands(false);
+    inputRef.current?.focus();
   };
 
   // Focus chat when "Discuss" is clicked (via custom event)
@@ -903,22 +950,52 @@ export function ChatPanel({ isExpanded = false, onToggleExpand }: ChatPanelProps
       {/* Input */}
       <div className="border-t border-slate-200 p-4 dark:border-slate-800">
         <div className="flex gap-2">
-          <textarea
-            ref={inputRef}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder={contextMode
-              ? "How does [news] affect my thesis?"
-              : "Ask me anything..."
-            }
-            rows={isExpanded ? 2 : 1}
-            className={`flex-1 resize-none rounded-xl border px-4 py-2.5 text-sm focus:outline-none focus:ring-1 dark:bg-slate-800 dark:text-white ${
-              contextMode
-                ? 'border-amber-300 focus:border-amber-500 focus:ring-amber-500 dark:border-amber-700'
-                : 'border-slate-300 focus:border-indigo-500 focus:ring-indigo-500 dark:border-slate-700'
-            }`}
-          />
+          <div className="relative flex-1">
+            <textarea
+              ref={inputRef}
+              value={input}
+              onChange={handleInputChange}
+              onKeyDown={handleKeyDown}
+              onFocus={() => input.startsWith('/') && setShowSlashCommands(true)}
+              onBlur={() => setTimeout(() => setShowSlashCommands(false), 150)}
+              placeholder={contextMode
+                ? "How does [news] affect my thesis? (type / for commands)"
+                : "Ask me anything... (type / for commands)"
+              }
+              rows={isExpanded ? 2 : 1}
+              className={`w-full resize-none rounded-xl border px-4 py-2.5 text-sm focus:outline-none focus:ring-1 dark:bg-slate-800 dark:text-white ${
+                contextMode
+                  ? 'border-amber-300 focus:border-amber-500 focus:ring-amber-500 dark:border-amber-700'
+                  : 'border-slate-300 focus:border-indigo-500 focus:ring-indigo-500 dark:border-slate-700'
+              }`}
+            />
+            {/* Slash command suggestions */}
+            {showSlashCommands && (
+              <div className="absolute bottom-full left-0 right-0 mb-2 rounded-xl border border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-800 overflow-hidden">
+                <div className="p-2 border-b border-slate-100 dark:border-slate-700">
+                  <p className="text-[10px] font-medium text-slate-500">Quick commands</p>
+                </div>
+                <div className="max-h-48 overflow-y-auto">
+                  {SLASH_COMMANDS.filter((c) =>
+                    c.command.toLowerCase().includes(slashFilter.toLowerCase()) ||
+                    c.description.toLowerCase().includes(slashFilter.toLowerCase())
+                  ).map((cmd, i) => (
+                    <button
+                      key={i}
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => handleSlashCommand(cmd)}
+                      className="w-full flex items-center gap-3 px-3 py-2 text-left hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                    >
+                      <code className="text-xs font-mono text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 px-1.5 py-0.5 rounded">
+                        {cmd.command}
+                      </code>
+                      <span className="text-xs text-slate-600 dark:text-slate-400">{cmd.description}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
           <button
             onClick={() => sendMessage()}
             disabled={!input.trim() || isLoading}
