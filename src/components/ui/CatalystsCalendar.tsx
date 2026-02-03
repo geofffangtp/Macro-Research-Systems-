@@ -14,6 +14,7 @@ import {
   Star,
 } from 'lucide-react';
 import { useAppStore } from '@/store';
+import { thisWeekCatalysts } from '@/lib/catalysts-seed';
 
 interface Catalyst {
   id: string;
@@ -105,7 +106,14 @@ export function CatalystsCalendar() {
   const [weekOffset, setWeekOffset] = useState(0);
   const [selectedCatalyst, setSelectedCatalyst] = useState<Catalyst | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [customCatalysts, setCustomCatalysts] = useState<Catalyst[]>([]);
+  // Initialize with seed catalysts for this week
+  const [customCatalysts, setCustomCatalysts] = useState<Catalyst[]>(() =>
+    thisWeekCatalysts.map((c, i) => ({
+      ...c,
+      id: `seed-${i}`,
+      sourceType: 'custom' as const,
+    }))
+  );
 
   // Convert data releases to catalysts
   const catalysts = useMemo(() => {
