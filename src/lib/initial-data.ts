@@ -249,12 +249,29 @@ export const FRED_SERIES_MAP: Record<string, string> = {
 export const initialDataReleases: Omit<DataRelease, 'id' | 'createdAt' | 'updatedAt'>[] = [
   // Tier 1: Core to Thesis (Always Track)
   {
-    name: 'ISM Manufacturing (New Orders vs Inventories)',
-    description: 'Key indicator for inventory cycle and restocking signal',
+    name: 'ISM Manufacturing PMI',
+    description: 'Key indicator for inventory cycle and restocking signal. New Orders vs Inventories spread is critical.',
     frequency: 'monthly',
     tier: 'tier1',
     thesisConnection: 'Inventory glut thesis - watching for restocking signal',
+    nextReleaseDate: '2026-02-02', // First business day of month
     // No FRED series - manual entry required
+  },
+  {
+    name: 'ISM Services PMI',
+    description: 'Services sector health - 70%+ of US economy',
+    frequency: 'monthly',
+    tier: 'tier1',
+    thesisConnection: 'Services inflation stickiness indicator',
+    nextReleaseDate: '2026-02-04', // Third business day of month
+  },
+  {
+    name: 'Employment Situation (NFP)',
+    description: 'Nonfarm payrolls, unemployment rate, wage growth. January 2026 data with annual benchmark revisions.',
+    frequency: 'monthly',
+    tier: 'tier1',
+    thesisConnection: 'Labor market health - key for Fed policy path',
+    nextReleaseDate: '2026-02-06', // First Friday of month
   },
   {
     name: 'Cass Freight Index',
@@ -279,6 +296,7 @@ export const initialDataReleases: Omit<DataRelease, 'id' | 'createdAt' | 'update
     tier: 'tier1',
     thesisConnection: 'Labor market real-time signal',
     fredSeriesId: 'ICSA',
+    nextReleaseDate: '2026-02-06', // Thursday morning
   },
   {
     name: 'Avg Duration of Unemployment',

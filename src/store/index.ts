@@ -43,6 +43,7 @@ interface AppState {
 
   // Data Releases
   dataReleases: DataRelease[];
+  addDataRelease: (release: Omit<DataRelease, 'id' | 'createdAt' | 'updatedAt'>) => void;
   updateDataRelease: (id: string, updates: Partial<DataRelease>) => void;
 
   // Knowledge Base
@@ -396,6 +397,21 @@ export const useAppStore = create<AppState>()(
       },
 
       // Data Release actions
+      addDataRelease: (release) => {
+        const newRelease: DataRelease = {
+          ...release,
+          id: generateId(),
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        set((state) => ({ dataReleases: [...state.dataReleases, newRelease] }));
+
+        // Sync to Supabase
+        if (get().isSupabaseConnected) {
+          db.saveDataRelease(newRelease).catch((err) => console.error('Failed to save data release:', err));
+        }
+      },
+
       updateDataRelease: (id, updates) => {
         let updatedRelease: DataRelease | undefined;
         set((state) => {
