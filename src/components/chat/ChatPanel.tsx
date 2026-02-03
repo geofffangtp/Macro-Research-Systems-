@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Send, Loader2, MessageSquare, Sparkles, Globe, ChevronDown, ChevronUp, X, BookmarkPlus, Save, Maximize2, Minimize2, BookOpen, Zap, Settings, Swords, FileText, ListTree, ToggleLeft, ToggleRight, Copy, Check, TrendingUp } from 'lucide-react';
+import { Send, Loader2, MessageSquare, Sparkles, Globe, ChevronDown, ChevronUp, X, BookmarkPlus, Save, Maximize2, Minimize2, BookOpen, Zap, Settings, Swords, FileText, ListTree, ToggleLeft, ToggleRight, Copy, Check, TrendingUp, Download, RefreshCw, Sparkle } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { useAppStore } from '@/store';
 import { SaveToKBModal } from './SaveToKBModal';
@@ -112,6 +112,75 @@ export function ChatPanel({ isExpanded = false, onToggleExpand }: ChatPanelProps
       setTimeout(() => setCopiedIndex(null), 2000);
     } catch (err) {
       console.error('Failed to copy:', err);
+    }
+  };
+
+  // Export conversation to markdown
+  const handleExportMarkdown = () => {
+    if (messages.length === 0) return;
+
+    const date = new Date().toISOString().split('T')[0];
+    let markdown = `# Research Conversation - ${date}\n\n`;
+
+    if (contextMode && thesis) {
+      markdown += `> **Thesis Context:** ${thesis.name}\n\n`;
+    }
+
+    messages.forEach((msg) => {
+      if (msg.role === 'user') {
+        markdown += `## Question\n${msg.content}\n\n`;
+      } else {
+        markdown += `## Analysis\n${msg.content}\n\n---\n\n`;
+      }
+    });
+
+    const blob = new Blob([markdown], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `research-${date}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // Re-ask last question with current settings
+  const handleReask = () => {
+    const lastUserMessage = [...messages].reverse().find((m) => m.role === 'user');
+    if (lastUserMessage) {
+      setInput(lastUserMessage.content);
+      inputRef.current?.focus();
+    }
+  };
+
+  // Summarize conversation
+  const handleSummarize = async () => {
+    if (messages.length < 2 || isLoading) return;
+
+    setIsLoading(true);
+    try {
+      const conversationText = messages.map((m) => `${m.role}: ${m.content}`).join('\n\n');
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: `Summarize this conversation in 3-5 bullet points. What were the key insights and conclusions?\n\n${conversationText}`,
+          useContext: false,
+          responseLength: 'concise',
+          enableWebSearch: false,
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setMessages((prev) => [...prev,
+          { role: 'user' as const, content: '[Summarize conversation]' },
+          { role: 'assistant' as const, content: data.response }
+        ]);
+      }
+    } catch (err) {
+      console.error('Summarize error:', err);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -432,6 +501,37 @@ export function ChatPanel({ isExpanded = false, onToggleExpand }: ChatPanelProps
           >
             <Settings size={16} />
           </button>
+          {/* Export to Markdown */}
+          {messages.length >= 2 && (
+            <button
+              onClick={handleExportMarkdown}
+              className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800"
+              title="Export to markdown"
+            >
+              <Download size={14} />
+            </button>
+          )}
+          {/* Summarize */}
+          {messages.length >= 4 && (
+            <button
+              onClick={handleSummarize}
+              disabled={isLoading}
+              className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 disabled:opacity-50"
+              title="Summarize conversation"
+            >
+              <Sparkle size={14} />
+            </button>
+          )}
+          {/* Re-ask with current settings */}
+          {messages.length >= 2 && (
+            <button
+              onClick={handleReask}
+              className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800"
+              title="Re-ask last question"
+            >
+              <RefreshCw size={14} />
+            </button>
+          )}
           {/* Discard Chat Button */}
           {messages.length >= 1 && (
             <button
@@ -451,7 +551,7 @@ export function ChatPanel({ isExpanded = false, onToggleExpand }: ChatPanelProps
               title="Save entire conversation to Knowledge Base"
             >
               <Save size={14} />
-              <span className="hidden sm:inline">Save Chat</span>
+              <span className="hidden sm:inline">Save</span>
             </button>
           )}
           {/* Expand/Collapse Button */}
