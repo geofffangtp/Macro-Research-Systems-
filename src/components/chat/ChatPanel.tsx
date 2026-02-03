@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Send, Loader2, MessageSquare, Sparkles, Globe, ChevronDown, ChevronUp, X, BookmarkPlus, Save, Maximize2, Minimize2, BookOpen, Zap, Settings, Swords, FileText, ListTree, ToggleLeft, ToggleRight } from 'lucide-react';
+import { Send, Loader2, MessageSquare, Sparkles, Globe, ChevronDown, ChevronUp, X, BookmarkPlus, Save, Maximize2, Minimize2, BookOpen, Zap, Settings, Swords, FileText, ListTree, ToggleLeft, ToggleRight, Copy, Check, TrendingUp } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
 import { useAppStore } from '@/store';
 import { SaveToKBModal } from './SaveToKBModal';
 import { SaveConversationModal } from './SaveConversationModal';
@@ -39,6 +40,26 @@ const MACRO_TOPICS = [
   "Yield curve",
 ];
 
+// Analysis templates for common workflows
+const ANALYSIS_TEMPLATES = [
+  {
+    name: "Stock Deep Dive",
+    prompt: "Give me a comprehensive investment analysis of [TICKER]. Cover: business model, competitive moat, financial health (specific numbers), valuation vs history, key risks, and what would make you bullish vs bearish.",
+  },
+  {
+    name: "PE Industry Scan",
+    prompt: "Analyze the [INDUSTRY] space for a PE investor. Cover: TAM and growth rate, key players and positioning, what makes a winner, typical deal multiples (EV/Revenue, EV/EBITDA), and key investment risks.",
+  },
+  {
+    name: "Macro Data Reaction",
+    prompt: "The latest [DATA RELEASE] came in at [NUMBER] vs [EXPECTATION] expected. Walk me through: what this means, market implications, how it affects Fed policy, and what to watch next.",
+  },
+  {
+    name: "Position Stress Test",
+    prompt: "I'm [LONG/SHORT] [POSITION] based on [THESIS]. Steel man the case against me. What could make this trade blow up? What am I missing?",
+  },
+];
+
 interface ChatPanelProps {
   isExpanded?: boolean;
   onToggleExpand?: () => void;
@@ -73,11 +94,26 @@ export function ChatPanel({ isExpanded = false, onToggleExpand }: ChatPanelProps
   const [suggestFollowUps, setSuggestFollowUps] = useState(true);
   // Settings panel open
   const [showSettings, setShowSettings] = useState(false);
+  // Track which message was just copied
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+  // Show thesis summary panel
+  const [showThesisSummary, setShowThesisSummary] = useState(false);
   const [saveModalOpen, setSaveModalOpen] = useState(false);
   const [saveConversationModalOpen, setSaveConversationModalOpen] = useState(false);
   const [messageToSave, setMessageToSave] = useState<{ assistant: string; user: string } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // Copy message to clipboard
+  const handleCopyMessage = async (content: string, index: number) => {
+    try {
+      await navigator.clipboard.writeText(content);
+      setCopiedIndex(index);
+      setTimeout(() => setCopiedIndex(null), 2000);
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
+  };
 
   // Handle save to KB - find the preceding user message
   const handleSaveToKB = (assistantIndex: number) => {
@@ -515,6 +551,36 @@ export function ChatPanel({ isExpanded = false, onToggleExpand }: ChatPanelProps
         </div>
       )}
 
+      {/* Thesis Summary Panel (context mode only) */}
+      {contextMode && thesis && showThesisSummary && (
+        <div className="border-b border-amber-200 bg-amber-50/50 px-4 py-3 dark:border-amber-800 dark:bg-amber-900/10">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1">
+                <TrendingUp size={14} className="text-amber-600 dark:text-amber-400" />
+                <h4 className="font-semibold text-sm text-amber-900 dark:text-amber-200 truncate">{thesis.name}</h4>
+              </div>
+              <p className="text-xs text-amber-800 dark:text-amber-300 line-clamp-2">{thesis.summary}</p>
+              {thesis.scenarios && thesis.scenarios.length > 0 && (
+                <div className="flex gap-2 mt-2">
+                  {thesis.scenarios.map((s, i) => (
+                    <span key={i} className="text-[10px] bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-1.5 py-0.5 rounded">
+                      {s.name}: {s.probability}%
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+            <button
+              onClick={() => setShowThesisSummary(false)}
+              className="text-amber-500 hover:text-amber-700 dark:text-amber-400"
+            >
+              <X size={14} />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Context indicator (collapsible) */}
       {showContext && (
         <div className={`border-b px-4 py-2 ${
@@ -534,9 +600,12 @@ export function ChatPanel({ isExpanded = false, onToggleExpand }: ChatPanelProps
                   </span>
                 )}
                 {thesis && (
-                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
-                    Thesis: {thesis.name}
-                  </span>
+                  <button
+                    onClick={() => setShowThesisSummary(!showThesisSummary)}
+                    className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700 hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-400 transition-colors"
+                  >
+                    Thesis: {thesis.name} {showThesisSummary ? '▲' : '▼'}
+                  </button>
                 )}
                 {knowledgeEntries.length > 0 && (
                   <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
@@ -634,6 +703,27 @@ export function ChatPanel({ isExpanded = false, onToggleExpand }: ChatPanelProps
               </div>
             )}
 
+            {/* Analysis Templates */}
+            {!contextMode && isExpanded && (
+              <div className="mt-4 space-y-2">
+                <p className="text-xs font-medium text-slate-500 text-center">Analysis templates:</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {ANALYSIS_TEMPLATES.map((template, i) => (
+                    <button
+                      key={i}
+                      onClick={() => {
+                        setInput(template.prompt);
+                        inputRef.current?.focus();
+                      }}
+                      className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-xs text-slate-600 hover:border-violet-300 hover:bg-violet-50 transition-colors dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400"
+                    >
+                      <span className="font-medium text-slate-700 dark:text-slate-300">{template.name}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Mode hint */}
             <div className="mt-4 text-center">
               <button
@@ -666,17 +756,32 @@ export function ChatPanel({ isExpanded = false, onToggleExpand }: ChatPanelProps
                     : 'bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-white'
                 }`}
               >
-                <p className="text-sm whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+                {msg.role === 'assistant' ? (
+                  <div className="prose prose-sm prose-slate dark:prose-invert max-w-none prose-p:my-2 prose-ul:my-2 prose-li:my-0 prose-headings:my-2 prose-strong:text-slate-900 dark:prose-strong:text-white">
+                    <ReactMarkdown>{msg.content}</ReactMarkdown>
+                  </div>
+                ) : (
+                  <p className="text-sm whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+                )}
               </div>
-              {/* Save to KB button - only on assistant messages */}
+              {/* Action buttons - only on assistant messages */}
               {msg.role === 'assistant' && hoveredMessageIndex === i && (
-                <button
-                  onClick={() => handleSaveToKB(i)}
-                  className="absolute -right-2 -top-2 flex h-7 w-7 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg hover:bg-emerald-600 transition-all"
-                  title="Save to Knowledge Base"
-                >
-                  <BookmarkPlus size={14} />
-                </button>
+                <div className="absolute -right-2 -top-2 flex gap-1">
+                  <button
+                    onClick={() => handleCopyMessage(msg.content, i)}
+                    className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-500 text-white shadow-lg hover:bg-slate-600 transition-all"
+                    title="Copy message"
+                  >
+                    {copiedIndex === i ? <Check size={14} /> : <Copy size={14} />}
+                  </button>
+                  <button
+                    onClick={() => handleSaveToKB(i)}
+                    className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg hover:bg-emerald-600 transition-all"
+                    title="Save to Knowledge Base"
+                  >
+                    <BookmarkPlus size={14} />
+                  </button>
+                </div>
               )}
             </div>
           </div>
