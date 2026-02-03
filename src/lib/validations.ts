@@ -96,6 +96,12 @@ export const chatRequestSchema = z.object({
   enableWebSearch: z.boolean().optional(),
   // Control context loading: true = load thesis/KB/digest, false = clean mode
   useContext: z.boolean().optional(),
+  // Response length: 'concise' for shorter answers, 'detailed' for comprehensive
+  responseLength: z.enum(['concise', 'detailed']).optional(),
+  // Devil's advocate mode: always argue the opposite position
+  devilsAdvocate: z.boolean().optional(),
+  // Request follow-up suggestions
+  suggestFollowUps: z.boolean().optional(),
 });
 
 // Digest generation schema

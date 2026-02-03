@@ -36,8 +36,26 @@ interface ContextData {
   }>;
 }
 
+interface PromptOptions {
+  responseLength?: 'concise' | 'detailed';
+  devilsAdvocate?: boolean;
+  suggestFollowUps?: boolean;
+}
+
 // Clean mode - no context loaded, pure conversation
-function buildCleanSystemPrompt(): string {
+function buildCleanSystemPrompt(options: PromptOptions = {}): string {
+  const lengthInstruction = options.responseLength === 'concise'
+    ? '\n\n**LENGTH: Keep responses under 300 words. Be direct and skip obvious context.**'
+    : '';
+
+  const devilsAdvocateInstruction = options.devilsAdvocate
+    ? '\n\n**DEVIL\'S ADVOCATE MODE: Always argue the OPPOSITE of whatever view the user presents. If they\'re bullish, be bearish. If they\'re bearish, be bullish. Don\'t hedge - commit to the contrarian position and make the strongest possible case.**'
+    : '';
+
+  const followUpInstruction = options.suggestFollowUps
+    ? '\n\n**At the end of your response, add a "---" separator and suggest 2-3 specific follow-up questions the user might want to explore, formatted as a bullet list.**'
+    : '';
+
   return `You are a senior macro research analyst. Your job is to help me understand markets, economics, and investment concepts.
 
 How to respond:
@@ -65,11 +83,23 @@ How to respond:
 - If data is mixed or unclear, say so - don't force a clean narrative
 - Think like an analyst, not an advocate
 
-I want a research partner who helps me see clearly, not one who confirms what I already believe.`;
+I want a research partner who helps me see clearly, not one who confirms what I already believe.${lengthInstruction}${devilsAdvocateInstruction}${followUpInstruction}`;
 }
 
 // Context mode - load thesis and research context
-function buildContextSystemPrompt(context: ContextData): string {
+function buildContextSystemPrompt(context: ContextData, options: PromptOptions = {}): string {
+  const lengthInstruction = options.responseLength === 'concise'
+    ? '\n\n**LENGTH: Keep responses under 300 words. Be direct and skip obvious context.**'
+    : '';
+
+  const devilsAdvocateInstruction = options.devilsAdvocate
+    ? '\n\n**DEVIL\'S ADVOCATE MODE: Actively argue AGAINST the user\'s thesis. Find every weakness, every assumption that could be wrong, every way the market could prove them wrong. Don\'t hedge - be the toughest critic possible.**'
+    : '';
+
+  const followUpInstruction = options.suggestFollowUps
+    ? '\n\n**At the end of your response, add a "---" separator and suggest 2-3 specific follow-up questions related to the thesis, formatted as a bullet list.**'
+    : '';
+
   let systemPrompt = `You are a senior macro research analyst helping me analyze how new information affects my investment thesis.
 
 I'm sharing my current thesis and research context below. Help me:
@@ -78,7 +108,7 @@ I'm sharing my current thesis and research context below. Help me:
 - Think through implications
 - Update my views if warranted
 
-Be direct. If my thesis has holes, tell me. If the data doesn't support my view, say so clearly.
+Be direct. If my thesis has holes, tell me. If the data doesn't support my view, say so clearly.${lengthInstruction}${devilsAdvocateInstruction}${followUpInstruction}
 
 ---
 MY CURRENT THESIS AND CONTEXT:
@@ -121,7 +151,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: validation.error }, { status: 400 });
     }
 
-    const { item, message, previousMessages, thesis, context, enableWebSearch, useContext } = validation.data;
+    const { item, message, previousMessages, thesis, context, enableWebSearch, useContext, responseLength, devilsAdvocate, suggestFollowUps } = validation.data;
+
+    const promptOptions: PromptOptions = {
+      responseLength,
+      devilsAdvocate,
+      suggestFollowUps,
+    };
 
     if (!process.env.ANTHROPIC_API_KEY) {
       return NextResponse.json(
@@ -135,7 +171,7 @@ export async function POST(request: NextRequest) {
 
     if (useContext === false) {
       // Explicit clean mode - no context
-      systemPrompt = buildCleanSystemPrompt();
+      systemPrompt = buildCleanSystemPrompt(promptOptions);
     } else if (context || item || thesis) {
       // Context provided - use context mode
       let fullContext: ContextData = {};
@@ -157,10 +193,10 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      systemPrompt = buildContextSystemPrompt(fullContext);
+      systemPrompt = buildContextSystemPrompt(fullContext, promptOptions);
     } else {
       // No context provided - default to clean mode
-      systemPrompt = buildCleanSystemPrompt();
+      systemPrompt = buildCleanSystemPrompt(promptOptions);
     }
 
     const messages: Array<{ role: 'user' | 'assistant'; content: string }> = [];

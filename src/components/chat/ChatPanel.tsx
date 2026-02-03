@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Send, Loader2, MessageSquare, Sparkles, Globe, ChevronDown, ChevronUp, X, BookmarkPlus, Save, Maximize2, Minimize2, Plus, BookOpen, Zap } from 'lucide-react';
+import { Send, Loader2, MessageSquare, Sparkles, Globe, ChevronDown, ChevronUp, X, BookmarkPlus, Save, Maximize2, Minimize2, BookOpen, Zap, Settings, Swords, FileText, ListTree, ToggleLeft, ToggleRight } from 'lucide-react';
 import { useAppStore } from '@/store';
 import { SaveToKBModal } from './SaveToKBModal';
 import { SaveConversationModal } from './SaveConversationModal';
@@ -14,17 +14,29 @@ interface Message {
 // Clean mode quick actions - general research questions
 const CLEAN_QUICK_ACTIONS = [
   { label: "Explain a concept", prompt: "Explain " },
-  { label: "Analyze a view", prompt: "Here's a view I'm considering: " },
-  { label: "What am I missing?", prompt: "I'm thinking about [topic]. What might I be missing?" },
-  { label: "Compare perspectives", prompt: "What are the bull and bear cases for " },
+  { label: "Bull vs bear case", prompt: "What are the bull and bear cases for " },
+  { label: "Second-order effects", prompt: "What are the second-order effects of " },
+  { label: "Historical parallels", prompt: "What historical parallels exist for " },
 ];
 
 // Context mode quick actions - thesis-specific
 const CONTEXT_QUICK_ACTIONS = [
-  { label: "How does this affect my thesis?", prompt: "How does today's news affect my thesis? Be specific about what confirms or challenges it." },
-  { label: "What challenges my view?", prompt: "What from today's digest challenges or contradicts my current thesis? Be direct." },
-  { label: "Update my scenarios", prompt: "Based on recent information, should I update my scenario probabilities? Walk me through it." },
-  { label: "Key monitors update", prompt: "How are my key monitors trending? What should I add or remove?" },
+  { label: "Thesis impact", prompt: "How does today's news affect my thesis? Be specific." },
+  { label: "Challenge my view", prompt: "Steel man the case against my thesis. What am I missing?" },
+  { label: "Update scenarios", prompt: "Should I update my scenario probabilities? Walk me through it." },
+  { label: "Trade expressions", prompt: "What are 3 specific trade expressions for my thesis with bull/bear for each?" },
+];
+
+// Hot macro topics for quick access
+const MACRO_TOPICS = [
+  "Fed policy path",
+  "China deflation",
+  "Yen carry trade",
+  "Credit spreads",
+  "Oil supply/demand",
+  "Fiscal dominance",
+  "Dollar strength",
+  "Yield curve",
 ];
 
 interface ChatPanelProps {
@@ -53,6 +65,14 @@ export function ChatPanel({ isExpanded = false, onToggleExpand }: ChatPanelProps
   const [hoveredMessageIndex, setHoveredMessageIndex] = useState<number | null>(null);
   // Context mode toggle - default OFF (clean mode) so Claude isn't biased by thesis/KB
   const [contextMode, setContextMode] = useState(false);
+  // Response length: 'concise' or 'detailed'
+  const [responseLength, setResponseLength] = useState<'concise' | 'detailed'>('detailed');
+  // Devil's advocate mode - always argue the opposite
+  const [devilsAdvocate, setDevilsAdvocate] = useState(false);
+  // Show follow-up suggestions
+  const [suggestFollowUps, setSuggestFollowUps] = useState(true);
+  // Settings panel open
+  const [showSettings, setShowSettings] = useState(false);
   const [saveModalOpen, setSaveModalOpen] = useState(false);
   const [saveConversationModalOpen, setSaveConversationModalOpen] = useState(false);
   const [messageToSave, setMessageToSave] = useState<{ assistant: string; user: string } | null>(null);
@@ -220,6 +240,9 @@ export function ChatPanel({ isExpanded = false, onToggleExpand }: ChatPanelProps
         previousMessages: messages.slice(-10), // Last 10 messages for context
         enableWebSearch: true,
         useContext: contextMode, // Tell API which mode we're in
+        responseLength,
+        devilsAdvocate,
+        suggestFollowUps,
       };
 
       // Only include context data if context mode is on
@@ -278,6 +301,30 @@ export function ChatPanel({ isExpanded = false, onToggleExpand }: ChatPanelProps
     return () => window.removeEventListener('discuss-item' as any, handleDiscuss as EventListener);
   }, []);
 
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyboard = (e: KeyboardEvent) => {
+      const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+      const modifier = isMac ? e.metaKey : e.ctrlKey;
+
+      if (modifier && e.key === 'k') {
+        e.preventDefault();
+        setShowSettings((prev) => !prev);
+      }
+      if (modifier && e.key === 'd' && !e.shiftKey) {
+        e.preventDefault();
+        setDevilsAdvocate((prev) => !prev);
+      }
+      if (modifier && e.shiftKey && e.key === 'C') {
+        e.preventDefault();
+        setContextMode((prev) => !prev);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyboard);
+    return () => window.removeEventListener('keydown', handleKeyboard);
+  }, []);
+
   if (isMinimized) {
     return (
       <div className="fixed bottom-4 right-4 z-40">
@@ -317,6 +364,13 @@ export function ChatPanel({ isExpanded = false, onToggleExpand }: ChatPanelProps
           </div>
         </div>
         <div className="flex items-center gap-1">
+          {/* Devil's Advocate Toggle */}
+          {devilsAdvocate && (
+            <span className="flex items-center gap-1 rounded-lg bg-red-100 px-2 py-1 text-[10px] font-medium text-red-700 dark:bg-red-900/30 dark:text-red-400">
+              <Swords size={12} />
+              Devil's Advocate
+            </span>
+          )}
           {/* Context Mode Toggle */}
           <button
             onClick={() => setContextMode(!contextMode)}
@@ -328,7 +382,19 @@ export function ChatPanel({ isExpanded = false, onToggleExpand }: ChatPanelProps
             title={contextMode ? 'Turn off thesis context' : 'Turn on thesis context'}
           >
             {contextMode ? <BookOpen size={14} /> : <Zap size={14} />}
-            <span className="hidden sm:inline">{contextMode ? 'Context On' : 'Clean Mode'}</span>
+            <span className="hidden sm:inline">{contextMode ? 'Context' : 'Clean'}</span>
+          </button>
+          {/* Settings Toggle */}
+          <button
+            onClick={() => setShowSettings(!showSettings)}
+            className={`rounded-lg p-1.5 transition-colors ${
+              showSettings
+                ? 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400'
+                : 'text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800'
+            }`}
+            title="Chat settings"
+          >
+            <Settings size={16} />
           </button>
           {/* Discard Chat Button */}
           {messages.length >= 1 && (
@@ -377,6 +443,77 @@ export function ChatPanel({ isExpanded = false, onToggleExpand }: ChatPanelProps
           </button>
         </div>
       </div>
+
+      {/* Settings Panel */}
+      {showSettings && (
+        <div className="border-b border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-800/50">
+          <div className="grid grid-cols-2 gap-3">
+            {/* Response Length */}
+            <div className="space-y-1">
+              <label className="text-[10px] font-medium uppercase tracking-wide text-slate-500">Response Length</label>
+              <div className="flex gap-1">
+                <button
+                  onClick={() => setResponseLength('concise')}
+                  className={`flex-1 rounded-lg px-2 py-1.5 text-xs font-medium transition-colors ${
+                    responseLength === 'concise'
+                      ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400'
+                      : 'bg-white text-slate-600 hover:bg-slate-100 dark:bg-slate-700 dark:text-slate-400'
+                  }`}
+                >
+                  <FileText size={12} className="inline mr-1" />
+                  Concise
+                </button>
+                <button
+                  onClick={() => setResponseLength('detailed')}
+                  className={`flex-1 rounded-lg px-2 py-1.5 text-xs font-medium transition-colors ${
+                    responseLength === 'detailed'
+                      ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400'
+                      : 'bg-white text-slate-600 hover:bg-slate-100 dark:bg-slate-700 dark:text-slate-400'
+                  }`}
+                >
+                  <ListTree size={12} className="inline mr-1" />
+                  Detailed
+                </button>
+              </div>
+            </div>
+
+            {/* Follow-up Suggestions */}
+            <div className="space-y-1">
+              <label className="text-[10px] font-medium uppercase tracking-wide text-slate-500">Follow-ups</label>
+              <button
+                onClick={() => setSuggestFollowUps(!suggestFollowUps)}
+                className={`w-full flex items-center justify-between rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+                  suggestFollowUps
+                    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                    : 'bg-white text-slate-600 dark:bg-slate-700 dark:text-slate-400'
+                }`}
+              >
+                <span>Suggest questions</span>
+                {suggestFollowUps ? <ToggleRight size={16} /> : <ToggleLeft size={16} />}
+              </button>
+            </div>
+
+            {/* Devil's Advocate Mode */}
+            <div className="col-span-2 space-y-1">
+              <label className="text-[10px] font-medium uppercase tracking-wide text-slate-500">Argument Mode</label>
+              <button
+                onClick={() => setDevilsAdvocate(!devilsAdvocate)}
+                className={`w-full flex items-center justify-between rounded-lg px-3 py-2 text-xs font-medium transition-colors ${
+                  devilsAdvocate
+                    ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                    : 'bg-white text-slate-600 hover:bg-slate-100 dark:bg-slate-700 dark:text-slate-400'
+                }`}
+              >
+                <span className="flex items-center gap-2">
+                  <Swords size={14} />
+                  Devil's Advocate - Always argue the opposite
+                </span>
+                {devilsAdvocate ? <ToggleRight size={16} /> : <ToggleLeft size={16} />}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Context indicator (collapsible) */}
       {showContext && (
@@ -476,6 +613,27 @@ export function ChatPanel({ isExpanded = false, onToggleExpand }: ChatPanelProps
               </div>
             </div>
 
+            {/* Hot Topics */}
+            {!contextMode && (
+              <div className="mt-4 space-y-2">
+                <p className="text-xs font-medium text-slate-500 text-center">Hot topics:</p>
+                <div className="flex flex-wrap justify-center gap-1.5">
+                  {MACRO_TOPICS.map((topic, i) => (
+                    <button
+                      key={i}
+                      onClick={() => {
+                        setInput(`Explain ${topic} and what I should be watching`);
+                        inputRef.current?.focus();
+                      }}
+                      className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] text-slate-600 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 transition-colors dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400 dark:hover:border-indigo-700"
+                    >
+                      {topic}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Mode hint */}
             <div className="mt-4 text-center">
               <button
@@ -565,7 +723,7 @@ export function ChatPanel({ isExpanded = false, onToggleExpand }: ChatPanelProps
           </button>
         </div>
         <p className="mt-2 text-[10px] text-slate-400 text-center">
-          Press Enter to send • Shift+Enter for new line
+          Enter to send • ⌘K settings • ⌘D devil's advocate • ⌘⇧C context
         </p>
       </div>
 
